@@ -57,6 +57,19 @@ void main() {
       fileSystem = MemoryFileSystem.test();
     });
 
+    test('resolves Linux GTK only for Linux desktop devices', () {
+      final command = TestRunCommandForLinuxGtk();
+
+      command.devices = <Device>[FakePlatformTypeDevice(PlatformType.linux)];
+      expect(command.resolvesLinuxGtk, isTrue);
+
+      command.devices = <Device>[FakePlatformTypeDevice(PlatformType.custom)];
+      expect(command.resolvesLinuxGtk, isFalse);
+
+      command.devices = <Device>[FakePlatformTypeDevice(PlatformType.android)];
+      expect(command.resolvesLinuxGtk, isFalse);
+    });
+
     testUsingContext(
       'fails when target not found',
       () async {
@@ -2109,6 +2122,17 @@ class TestRunCommandForUsageValues extends RunCommand {
       packageConfigPath: '.dart_tool/package_config.json',
     );
   }
+}
+
+class TestRunCommandForLinuxGtk extends RunCommand {
+  bool get resolvesLinuxGtk => shouldResolveLinuxGtk;
+}
+
+class FakePlatformTypeDevice extends Fake implements Device {
+  FakePlatformTypeDevice(this.platformType);
+
+  @override
+  final PlatformType platformType;
 }
 
 class TestRunCommandWithFakeResidentRunner extends RunCommand {

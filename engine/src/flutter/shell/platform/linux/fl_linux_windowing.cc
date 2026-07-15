@@ -161,7 +161,13 @@ G_MODULE_EXPORT void fl_linux_windowing_get_window_size(GtkWindow* window,
   g_return_if_fail(width != nullptr);
   g_return_if_fail(height != nullptr);
 #if FLUTTER_LINUX_GTK4
-  gtk_window_get_default_size(window, width, height);
+  FlGdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(window));
+  if (surface != nullptr) {
+    *width = gdk_surface_get_width(surface);
+    *height = gdk_surface_get_height(surface);
+  } else {
+    gtk_window_get_default_size(window, width, height);
+  }
 #else
   gtk_window_get_size(window, width, height);
 #endif

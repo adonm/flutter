@@ -142,14 +142,14 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
   self->on_close = on_close;
   self->on_destroy = on_destroy;
 #if FLUTTER_LINUX_GTK4
-  g_signal_connect_object(window, "notify::default-width",
-                          G_CALLBACK(configure_notify_cb), self,
-                          G_CONNECT_SWAPPED);
-  g_signal_connect_object(window, "notify::default-height",
-                          G_CALLBACK(configure_notify_cb), self,
-                          G_CONNECT_SWAPPED);
   GdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(window));
   if (surface != nullptr && GDK_IS_TOPLEVEL(surface)) {
+    g_signal_connect_object(surface, "notify::width",
+                            G_CALLBACK(configure_notify_cb), self,
+                            G_CONNECT_SWAPPED);
+    g_signal_connect_object(surface, "notify::height",
+                            G_CALLBACK(configure_notify_cb), self,
+                            G_CONNECT_SWAPPED);
     g_signal_connect_object(surface, "notify::state",
                             G_CALLBACK(toplevel_state_notify_cb), self,
                             G_CONNECT_SWAPPED);

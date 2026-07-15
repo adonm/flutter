@@ -42,6 +42,23 @@ TEST_F(FlLinuxWindowingTest, SetsWindowSize) {
 #endif
 }
 
+#if FLUTTER_LINUX_GTK4
+TEST_F(FlLinuxWindowingTest, GetsRealizedSurfaceSize) {
+  g_autoptr(GtkWindow) window = GTK_WINDOW(
+      g_object_ref_sink(g_object_new(gtk_window_get_type(), nullptr)));
+  gtk_window_set_default_size(window, 640, 480);
+  gtk_widget_realize(GTK_WIDGET(window));
+  GdkSurface* surface = gtk_native_get_surface(GTK_NATIVE(window));
+  ASSERT_NE(surface, nullptr);
+
+  gint width = 0;
+  gint height = 0;
+  fl_linux_windowing_get_window_size(window, &width, &height);
+  EXPECT_EQ(width, gdk_surface_get_width(surface));
+  EXPECT_EQ(height, gdk_surface_get_height(surface));
+}
+#endif
+
 TEST_F(FlLinuxWindowingTest, SetsWindowConstraints) {
   g_autoptr(GtkWindow) window = GTK_WINDOW(
       g_object_ref_sink(g_object_new(gtk_window_get_type(), nullptr)));
