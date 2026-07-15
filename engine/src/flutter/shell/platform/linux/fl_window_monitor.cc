@@ -28,6 +28,7 @@ struct _FlWindowMonitor {
 
 G_DEFINE_TYPE(FlWindowMonitor, fl_window_monitor, G_TYPE_OBJECT)
 
+#if !FLUTTER_LINUX_GTK4
 static gboolean configure_event_cb(FlWindowMonitor* self,
                                    GdkEventConfigure* event) {
   flutter::IsolateScope scope(self->isolate);
@@ -83,6 +84,7 @@ static void destroy_cb(FlWindowMonitor* self) {
   flutter::IsolateScope scope(self->isolate);
   self->on_destroy();
 }
+#endif
 
 static void fl_window_monitor_dispose(GObject* object) {
   FlWindowMonitor* self = FL_WINDOW_MONITOR(object);
@@ -119,6 +121,7 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
   self->on_moved_to_rect = on_moved_to_rect;
   self->on_close = on_close;
   self->on_destroy = on_destroy;
+#if !FLUTTER_LINUX_GTK4
   g_signal_connect_object(window, "configure-event",
                           G_CALLBACK(configure_event_cb), self,
                           G_CONNECT_SWAPPED);
@@ -137,6 +140,7 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
                           self, G_CONNECT_SWAPPED);
   g_signal_connect_object(window, "destroy", G_CALLBACK(destroy_cb), self,
                           G_CONNECT_SWAPPED);
+#endif
 
   return self;
 }
