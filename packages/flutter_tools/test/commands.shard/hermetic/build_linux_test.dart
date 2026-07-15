@@ -271,6 +271,46 @@ void main() {
   );
 
   testUsingContext(
+    'GTK4 build rejects a GTK3-only runner',
+    () async {
+      final command = BuildCommand(
+        androidSdk: FakeAndroidSdk(),
+        buildSystem: TestBuildSystem.all(BuildResult(success: true)),
+        fileSystem: fileSystem,
+        logger: logger,
+        osUtils: FakeOperatingSystemUtils(),
+        config: FakeConfig(),
+        platform: FakePlatform(),
+        fileSystemUtils: FakeFileSystemUtils(),
+        terminal: FakeTerminal(),
+        plistParser: FakePlistParser(),
+        processUtils: FakeProcessUtils(),
+        processManager: FakeProcessManager.any(),
+        templateRenderer: FakeTemplateRenderer(),
+        xcode: FakeXcode(),
+        artifacts: FakeArtifacts(),
+        cache: FakeCache(),
+        flutterVersion: FakeFlutterVersion(),
+      );
+      setUpMockProjectFilesForBuild();
+
+      expect(
+        createTestCommandRunner(
+          command,
+        ).run(const <String>['build', 'linux', '--no-pub', '--linux-gtk=gtk4']),
+        throwsToolExit(message: 'This project has a GTK3-only Linux runner.'),
+      );
+    },
+    overrides: <Type, Generator>{
+      FileSystem: () => fileSystem,
+      ProcessManager: () => processManager,
+      Platform: () => linuxPlatform,
+      FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: true),
+      OperatingSystemUtils: () => FakeOperatingSystemUtils(),
+    },
+  );
+
+  testUsingContext(
     'Linux build invokes CMake and ninja, and writes temporary files',
     () async {
       final command = BuildCommand(

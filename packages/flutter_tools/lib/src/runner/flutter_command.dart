@@ -1470,7 +1470,7 @@ abstract class FlutterCommand extends Command<void> {
 
     final Map<String, Object?> defineConfigJsonMap = extractDartDefineConfigJsonMap();
     final List<String> dartDefines = extractDartDefines(defineConfigJsonMap: defineConfigJsonMap);
-    final String linuxGtkVersion = _resolveLinuxGtkVersion();
+    final String? linuxGtkVersion = shouldResolveLinuxGtk ? _resolveLinuxGtkVersion() : null;
 
     final bool useCdn =
         !argParser.options.containsKey(FlutterOptions.kWebResourcesCdnFlag) ||
@@ -1498,7 +1498,9 @@ abstract class FlutterCommand extends Command<void> {
         dartDefines.add('$define=$value');
       }
     }
-    _addLinuxGtkToDartDefines(linuxGtkVersion, dartDefines);
+    if (linuxGtkVersion != null) {
+      _addLinuxGtkToDartDefines(linuxGtkVersion, dartDefines);
+    }
     _addFlutterVersionToDartDefines(globals.flutterVersion, dartDefines);
     _addFeatureFlagsToDartDefines(dartDefines);
 
@@ -1569,6 +1571,11 @@ abstract class FlutterCommand extends Command<void> {
     }
     return globalLinuxGtkVersion;
   }
+
+  /// Whether this command builds or runs a Linux target and needs a GTK
+  /// selection in its build information.
+  @protected
+  bool get shouldResolveLinuxGtk => false;
 
   bool _wasParsed(String optionName) {
     if (!argParser.options.containsKey(optionName)) {
@@ -1697,15 +1704,10 @@ abstract class FlutterCommand extends Command<void> {
   @override
   Future<void> run() {
     final DateTime startTime = globals.systemClock.now();
-    final overrides = <Type, Generator>{FlutterCommand: () => this};
-    final String? linuxDirOverride = _linuxDirectoryOverride;
-    if (linuxDirOverride != null) {
-      overrides[LinuxProjectDirectory] = () => LinuxProjectDirectory(linuxDirOverride);
-    }
 
     return context.run<void>(
       name: 'command',
-      overrides: overrides,
+      overrides: <Type, Generator>{FlutterCommand: () => this},
       body: () async {
         if (_usesFatalWarnings) {
           globals.logger.fatalWarnings = boolArg(FlutterOptions.kFatalWarnings);
@@ -1735,17 +1737,6 @@ abstract class FlutterCommand extends Command<void> {
         }
       },
     );
-  }
-
-  String? get _linuxDirectoryOverride {
-    if (!argParser.options.containsKey('linux-dir')) {
-      return null;
-    }
-    final String? value = stringArg('linux-dir');
-    if (value == null || value.trim().isEmpty) {
-      return null;
-    }
-    return value.trim();
   }
 
   @override

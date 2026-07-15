@@ -50,12 +50,6 @@ enum SupportedPlatform {
   root, // Special platform to represent the root project directory
 }
 
-class LinuxProjectDirectory {
-  LinuxProjectDirectory(this.path);
-
-  final String path;
-}
-
 class FlutterProjectFactory {
   FlutterProjectFactory({required Logger logger, required FileSystem fileSystem})
     : _logger = logger,
@@ -228,19 +222,7 @@ class FlutterProject {
   late final macos = MacOSProject.fromFlutter(this);
 
   /// The Linux sub project of this project.
-  LinuxProject get linux {
-    final LinuxProjectDirectory? override = globals.linuxProjectDirectory;
-    if (override == null) {
-      return _linux ??= LinuxProject.fromFlutter(this);
-    }
-    final FileSystem fs = directory.fileSystem;
-    final String overridePath = override.path;
-    final Directory overrideDirectory = fs.path.isAbsolute(overridePath)
-        ? fs.directory(overridePath)
-        : directory.childDirectory(overridePath);
-    return LinuxProject.fromFlutter(this, linuxDirectoryOverride: overrideDirectory);
-  }
-  LinuxProject? _linux;
+  late final linux = LinuxProject.fromFlutter(this);
 
   /// The Windows sub project of this project.
   late final windows = WindowsProject.fromFlutter(this);

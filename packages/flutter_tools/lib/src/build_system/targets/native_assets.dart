@@ -141,7 +141,9 @@ Directory _buildCodeAssetsDirectory(
       targetPlatform == TargetPlatform.linux_riscv64) {
     final String? linuxGtkVersion = environment.defines['FLUTTER_LINUX_GTK'];
     return environment.projectDir
-        .childDirectory(getLinuxBuildDirectory(targetPlatform, null, linuxGtkVersion))
+        .childDirectory(
+          getLinuxBuildDirectory(targetPlatform, environment.defines[kFlavor], linuxGtkVersion),
+        )
         .childDirectory(buildModeEnvironment);
   }
   return environment.outputDir;

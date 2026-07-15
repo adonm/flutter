@@ -36,16 +36,23 @@ void main() {
   });
 
   test(
-    'flutter create generates a GTK4 Linux project that builds',
+    'flutter create generates a Linux project that builds GTK4 and GTK3',
     () async {
       final File cmakeFile = projectRoot.childDirectory('linux').childFile('CMakeLists.txt');
       expect(cmakeFile, exists);
       expect(
         cmakeFile.readAsStringSync(),
-        contains('pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk4)'),
+        allOf(
+          contains('set(LINUX_GTK_PKG gtk4)'),
+          contains(r'pkg_check_modules(GTK REQUIRED IMPORTED_TARGET ${LINUX_GTK_PKG})'),
+        ),
+      );
+      expect(
+        projectRoot.childFile('pubspec.yaml').readAsStringSync(),
+        contains('linux-gtk-default: gtk4'),
       );
 
-      await _runFlutterSnapshot(<String>['build', 'linux', '--no-pub'], projectRoot);
+      await _runFlutterSnapshot(<String>['build', 'linux', '--debug', '--no-pub'], projectRoot);
 
       final arch = Abi.current() == Abi.linuxArm64 ? 'arm64' : 'x64';
       final File executable = fileSystem.file(
@@ -54,12 +61,34 @@ void main() {
           'build',
           'linux-gtk4',
           arch,
-          'release',
+          'debug',
           'bundle',
           'hello',
         ),
       );
       expect(executable, exists);
+
+      await _runFlutterSnapshot(<String>[
+        'build',
+        'linux',
+        '--debug',
+        '--no-pub',
+        '--linux-gtk=gtk3',
+      ], projectRoot);
+      expect(
+        fileSystem.file(
+          fileSystem.path.join(
+            projectRoot.path,
+            'build',
+            'linux',
+            arch,
+            'debug',
+            'bundle',
+            'hello',
+          ),
+        ),
+        exists,
+      );
     },
     skip: !platform.isLinux, // [intended] Linux builds only work on Linux.
   );

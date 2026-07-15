@@ -9,15 +9,10 @@ set(BINARY_NAME "{{projectName}}")
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "{{linuxIdentifier}}")
 
-set(_LINUX_GTK_VARIANT "$ENV{FLUTTER_LINUX_GTK}")
-if("${_LINUX_GTK_VARIANT}" STREQUAL "")
-  if(DEFINED LINUX_GTK_VARIANT)
-    set(_LINUX_GTK_VARIANT "${LINUX_GTK_VARIANT}")
-  else()
-    set(_LINUX_GTK_VARIANT "gtk3")
-  endif()
+if(NOT DEFINED LINUX_GTK_VARIANT)
+  set(LINUX_GTK_VARIANT "gtk3")
 endif()
-set(LINUX_GTK_VARIANT "${_LINUX_GTK_VARIANT}" CACHE STRING "Linux GTK runner variant" FORCE)
+set(LINUX_GTK_VARIANT "${LINUX_GTK_VARIANT}" CACHE STRING "Linux GTK runner variant" FORCE)
 set_property(CACHE LINUX_GTK_VARIANT PROPERTY STRINGS "gtk3" "gtk4")
 
 if("${LINUX_GTK_VARIANT}" STREQUAL "gtk4")

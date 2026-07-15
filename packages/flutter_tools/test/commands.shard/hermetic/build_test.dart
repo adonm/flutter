@@ -78,13 +78,26 @@ void main() {
   });
 
   testUsingContext('linux-gtk adds matching Dart define', () async {
-    final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
+    final command = FakeBuildInfoCommand(resolveLinuxGtk: true);
     final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
     await commandRunner.run(<String>['fake', '--linux-gtk=gtk4']);
 
     expect(command.buildInfo?.linuxGtkVersion, 'gtk4');
     expect(command.buildInfo?.dartDefines, contains('$kLinuxGtkDartDefine=gtk4'));
+  });
+
+  testUsingContext('non-Linux build information omits GTK selection', () async {
+    final command = FakeBuildInfoCommand();
+    final CommandRunner<void> commandRunner = createTestCommandRunner(command);
+
+    await commandRunner.run(<String>['fake']);
+
+    expect(command.buildInfo?.linuxGtkVersion, isNull);
+    expect(
+      command.buildInfo?.dartDefines,
+      isNot(contains(startsWith('$kLinuxGtkDartDefine='))),
+    );
   });
 
   final projectFileSystem = MemoryFileSystem.test();
@@ -104,7 +117,7 @@ flutter:
 ''');
       projectFileSystem.currentDirectory = '/package';
 
-      final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
+      final command = FakeBuildInfoCommand(resolveLinuxGtk: true);
       final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
       await commandRunner.run(<String>['fake']);
@@ -136,7 +149,7 @@ dependencies:
   testUsingContext(
     'linux-gtk reads global config default when project does not declare one',
     () async {
-    final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
+    final command = FakeBuildInfoCommand(resolveLinuxGtk: true);
       final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
       await commandRunner.run(<String>['fake']);
@@ -151,7 +164,7 @@ dependencies:
   );
 
   testUsingContext('linux-gtk accepts matching explicit Dart define', () async {
-    final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
+    final command = FakeBuildInfoCommand(resolveLinuxGtk: true);
     final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
     await commandRunner.run(<String>[
@@ -169,7 +182,7 @@ dependencies:
   });
 
   testUsingContext('linux-gtk rejects conflicting explicit Dart define', () {
-    final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
+    final command = FakeBuildInfoCommand(resolveLinuxGtk: true);
     final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
     expect(
@@ -337,11 +350,11 @@ dependencies:
 }
 
 class FakeBuildInfoCommand extends FlutterCommand {
-  FakeBuildInfoCommand({bool addLinuxGtkOption = false}) : super() {
+  FakeBuildInfoCommand({this.resolveLinuxGtk = false}) : super() {
     addSplitDebugInfoOption();
     addDartObfuscationOption();
     usesDartDefineOption();
-    if (addLinuxGtkOption) {
+    if (resolveLinuxGtk) {
       argParser.addOption(
         'linux-gtk',
         defaultsTo: 'gtk3',
@@ -351,6 +364,10 @@ class FakeBuildInfoCommand extends FlutterCommand {
   }
 
   BuildInfo? buildInfo;
+  final bool resolveLinuxGtk;
+
+  @override
+  bool get shouldResolveLinuxGtk => resolveLinuxGtk;
 
   @override
   String get description => '';

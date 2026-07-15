@@ -493,16 +493,10 @@ class RunCommand extends RunCommandBase {
       ..addFlag('build', defaultsTo: true, help: 'If necessary, build the app before running.')
       ..addOption('project-root', hide: !verboseHelp, help: 'Specify the project root directory.')
       ..addOption(
-        'linux-dir',
-        help:
-            'Override the Linux runner directory (relative to the project root). '
-            'Use this to run from an alternate Linux runner such as linux-gtk4.',
-      )
-      ..addOption(
         'linux-gtk',
         allowed: <String>['gtk3', 'gtk4'],
         help:
-            'Select the GTK variant for unified Linux runners. '
+            'Select the GTK version for the Linux runner. '
             'GTK4 runs use build/linux-gtk4 to avoid contaminating GTK3 builds.',
       )
       ..addFlag(
@@ -562,6 +556,11 @@ class RunCommand extends RunCommandBase {
   String get category => FlutterCommandCategory.project;
 
   List<Device>? devices;
+
+  @override
+  bool get shouldResolveLinuxGtk =>
+      devices?.any((Device device) => device.platformType == PlatformType.linux) ?? false;
+
   Future<WebDevServerConfig?> getWebDevServerConfig() async {
     // Only support "web mode" with a single web device due to resident runner
     // refactoring required otherwise.

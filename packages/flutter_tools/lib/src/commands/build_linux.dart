@@ -44,17 +44,11 @@ class BuildLinuxCommand extends BuildSubCommand {
           'if the current host and target architectures are different.',
     );
     argParser.addOption(
-      'linux-dir',
-      help:
-          'Override the Linux runner directory (relative to the project root). '
-          'Use this to build from an alternate Linux runner such as linux-gtk4.',
-    );
-    argParser.addOption(
       'linux-gtk',
       defaultsTo: 'gtk3',
       allowed: <String>['gtk3', 'gtk4'],
       help:
-          'Select the GTK variant for unified Linux runners. '
+          'Select the GTK version for the Linux runner. '
           'GTK4 builds use build/linux-gtk4 to avoid contaminating GTK3 builds.',
     );
     argParser.addFlag(
@@ -80,6 +74,9 @@ class BuildLinuxCommand extends BuildSubCommand {
   String get description => 'Build a Linux desktop application.';
 
   bool get configOnly => boolArg('config-only');
+
+  @override
+  bool get shouldResolveLinuxGtk => true;
 
   @override
   Future<FlutterCommandResult> runCommand() async {

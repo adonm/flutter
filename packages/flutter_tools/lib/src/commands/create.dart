@@ -87,17 +87,8 @@ class CreateCommand extends FlutterCommand with CreateBase {
     );
     argParser.addOption(
       'linux-gtk',
-      defaultsTo: 'gtk3',
-      allowed: <String>['gtk4', 'gtk3', 'linux-gtk-unified'],
-      help:
-          'Select the GTK Linux template (gtk3 default, gtk4 opt-in, '
-          'linux-gtk-unified experimental).',
-    );
-    argParser.addOption(
-      'linux-dir',
-      help:
-          'Override the Linux runner directory (relative to the project root). '
-          'Use this to generate an alternate Linux runner such as linux-gtk4.',
+      allowed: <String>['gtk4', 'gtk3'],
+      help: 'Select the GTK version for the generated Linux project.',
     );
     argParser.addFlag(
       'skip-name-checks',
@@ -477,8 +468,7 @@ class CreateCommand extends FlutterCommand with CreateBase {
       darwin: includeDarwin,
       web: includeWeb,
       linux: includeLinux,
-      linuxGtkVersion: stringArg('linux-gtk') ?? 'gtk3',
-      linuxDir: stringArg('linux-dir'),
+      linuxGtkVersion: stringArg('linux-gtk'),
       macos: includeMacos,
       windows: includeWindows,
       dartSdkVersionBounds: '^$dartSdk',

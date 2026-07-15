@@ -23,6 +23,7 @@ If you intend to contribute to Flutter, welcome! You are encouraged to start wit
 * [flutter.dev is down](./In-case-of-emergency.md)
 * [Issue prioritization](./contributing/issue_hygiene/README.md#priorities)
 * [Labels](./contributing/issue_hygiene/README.md#labels)
+* [Linux GTK version selection](./platforms/desktop/linux-gtk-variant.md)
 * [Milestones](./contributing/issue_hygiene/README.md#milestones)
 * [Plugin compatibility policy](./contributing/Style-guide-for-Flutter-repo.md#plugin-compatibility)
 * [Reviewing code](./contributing/Tree-hygiene.md#getting-a-code-review)

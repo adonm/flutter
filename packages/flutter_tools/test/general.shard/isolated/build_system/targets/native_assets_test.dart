@@ -77,13 +77,14 @@ void main() {
   }, overrides: <Type, Generator>{FeatureFlags: () => TestFeatureFlags()});
 
   testUsingContext(
-    'Linux GTK4 build hooks use the GTK4 CMake build directory',
+    'Linux GTK4 build hooks use the flavored GTK4 CMake build directory',
     () async {
       final linuxEnvironment = Environment.test(
         fileSystem.currentDirectory,
         defines: <String, String>{
           kBuildMode: BuildMode.debug.cliName,
           kTargetPlatform: getNameForTargetPlatform(TargetPlatform.linux_x64),
+          kFlavor: 'strawberry',
           'FLUTTER_LINUX_GTK': 'gtk4',
         },
         outputDir: fileSystem.currentDirectory.childDirectory('ignored-output'),
@@ -97,6 +98,7 @@ void main() {
       final Directory cmakeBuildDirectory = linuxEnvironment.rootBuildDir
           .childDirectory('linux-gtk4')
           .childDirectory('x64')
+          .childDirectory('strawberry')
           .childDirectory('debug');
       await cmakeBuildDirectory.create(recursive: true);
 

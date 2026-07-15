@@ -53,6 +53,16 @@ Future<void> buildLinux(
     );
   }
 
+  final String linuxGtkVersion = buildInfo.linuxGtkVersion ?? 'gtk3';
+  if (linuxGtkVersion == 'gtk4' && !_projectSupportsGtk4(linuxProject)) {
+    throwToolExit(
+      'This project has a GTK3-only Linux runner. Regenerate the Linux project '
+      'with a GTK4-capable Flutter SDK, then reapply any custom runner changes '
+      'before building with --linux-gtk=gtk4. See '
+      'docs/platforms/desktop/linux-gtk-variant.md.',
+    );
+  }
+
   final migrators = <ProjectMigrator>[
     CmakeCustomCommandMigration(linuxProject, logger),
     CmakeNativeAssetsMigration(linuxProject, 'linux', logger),
@@ -65,7 +75,6 @@ Future<void> buildLinux(
   // step.
   final Map<String, String> environmentConfig = buildInfo.toEnvironmentConfig();
   environmentConfig['FLUTTER_TARGET'] = target;
-  final String linuxGtkVersion = buildInfo.linuxGtkVersion ?? 'gtk3';
   environmentConfig['FLUTTER_LINUX_GTK'] = linuxGtkVersion;
   final LocalEngineInfo? localEngineInfo = globals.artifacts?.localEngineInfo;
   if (localEngineInfo != null) {
@@ -156,6 +165,16 @@ Future<void> buildLinux(
       'dart devtools --appSizeBase=${outputFile.path}',
     );
   }
+}
+
+bool _projectSupportsGtk4(LinuxProject linuxProject) {
+  if (!linuxProject.cmakeFile.existsSync() || !linuxProject.managedCmakeFile.existsSync()) {
+    return false;
+  }
+  final String projectCmake = linuxProject.cmakeFile.readAsStringSync();
+  final String managedCmake = linuxProject.managedCmakeFile.readAsStringSync();
+  return managedCmake.contains('libflutter_linux_gtk4.so') &&
+      (projectCmake.contains('LINUX_GTK_VARIANT') || projectCmake.contains('gtk4'));
 }
 
 Future<void> _runCmake(

@@ -1093,7 +1093,10 @@ void main() {
     expect(projectDir.childDirectory('linux').childFile('CMakeLists.txt'), exists);
     expect(
       projectDir.childDirectory('linux').childFile('CMakeLists.txt').readAsStringSync(),
-      contains('pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)'),
+      allOf(
+        contains('set(LINUX_GTK_VARIANT "gtk3")'),
+        contains(r'pkg_check_modules(GTK REQUIRED IMPORTED_TARGET ${LINUX_GTK_PKG})'),
+      ),
     );
     expect(
       projectDir
@@ -1101,7 +1104,11 @@ void main() {
           .childDirectory('flutter')
           .childFile('CMakeLists.txt')
           .readAsStringSync(),
-      contains('FLUTTER_LINUX_GTK3'),
+      contains(r'target_compile_definitions(flutter INTERFACE ${LINUX_GTK_DEFINE})'),
+    );
+    expect(
+      projectDir.childFile('pubspec.yaml').readAsStringSync(),
+      isNot(contains('linux-gtk-default:')),
     );
     expect(projectDir.childDirectory('android'), isNot(exists));
     expect(projectDir.childDirectory('ios'), isNot(exists));
@@ -1112,7 +1119,7 @@ void main() {
   }, overrides: overridesLinux);
 
   testUsingContext(
-    'app supports Linux GTK3 if requested',
+    'app pins Linux GTK3 if explicitly requested',
     () async {
       final command = CreateCommand();
       final CommandRunner<void> runner = createTestCommandRunner(command);
@@ -1128,7 +1135,10 @@ void main() {
       expect(projectDir.childDirectory('linux').childFile('CMakeLists.txt'), exists);
       expect(
         projectDir.childDirectory('linux').childFile('CMakeLists.txt').readAsStringSync(),
-        contains('pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)'),
+        allOf(
+          contains('set(LINUX_GTK_VARIANT "gtk3")'),
+          contains(r'pkg_check_modules(GTK REQUIRED IMPORTED_TARGET ${LINUX_GTK_PKG})'),
+        ),
       );
       expect(
         projectDir
@@ -1136,7 +1146,7 @@ void main() {
             .childDirectory('flutter')
             .childFile('CMakeLists.txt')
             .readAsStringSync(),
-        contains('FLUTTER_LINUX_GTK3'),
+        contains(r'target_compile_definitions(flutter INTERFACE ${LINUX_GTK_DEFINE})'),
       );
       expect(
         projectDir.childFile('pubspec.yaml').readAsStringSync(),
@@ -1163,43 +1173,8 @@ void main() {
       expect(projectDir.childDirectory('linux').childFile('CMakeLists.txt'), exists);
       expect(
         projectDir.childDirectory('linux').childFile('CMakeLists.txt').readAsStringSync(),
-        contains('pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk4)'),
-      );
-      expect(
-        projectDir
-            .childDirectory('linux')
-            .childDirectory('flutter')
-            .childFile('CMakeLists.txt')
-            .readAsStringSync(),
-        contains('FLUTTER_LINUX_GTK4'),
-      );
-      expect(
-        projectDir.childFile('pubspec.yaml').readAsStringSync(),
-        contains('linux-gtk-default: gtk4'),
-      );
-    },
-    overrides: {FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: true), Logger: () => logger},
-  );
-
-  testUsingContext(
-    'app supports unified Linux GTK template if requested',
-    () async {
-      final command = CreateCommand();
-      final CommandRunner<void> runner = createTestCommandRunner(command);
-
-      await runner.run(<String>[
-        'create',
-        '--no-pub',
-        '--platform=linux',
-        '--linux-gtk=linux-gtk-unified',
-        projectDir.path,
-      ]);
-
-      expect(projectDir.childDirectory('linux').childFile('CMakeLists.txt'), exists);
-      expect(
-        projectDir.childDirectory('linux').childFile('CMakeLists.txt').readAsStringSync(),
         allOf(
-          contains(r'$ENV{FLUTTER_LINUX_GTK}'),
+          contains('set(LINUX_GTK_PKG gtk4)'),
           contains(r'pkg_check_modules(GTK REQUIRED IMPORTED_TARGET ${LINUX_GTK_PKG})'),
         ),
       );
@@ -1210,6 +1185,10 @@ void main() {
             .childFile('CMakeLists.txt')
             .readAsStringSync(),
         contains(r'target_compile_definitions(flutter INTERFACE ${LINUX_GTK_DEFINE})'),
+      );
+      expect(
+        projectDir.childFile('pubspec.yaml').readAsStringSync(),
+        contains('linux-gtk-default: gtk4'),
       );
     },
     overrides: {FeatureFlags: () => TestFeatureFlags(isLinuxEnabled: true), Logger: () => logger},
@@ -1235,7 +1214,7 @@ void main() {
           .childDirectory('linux')
           .childFile('CMakeLists.txt')
           .readAsStringSync(),
-      contains('pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)'),
+      contains(r'pkg_check_modules(GTK REQUIRED IMPORTED_TARGET ${LINUX_GTK_PKG})'),
     );
     expect(projectDir.childDirectory('example').childDirectory('linux'), exists);
     expect(projectDir.childDirectory('example').childDirectory('android'), isNot(exists));
@@ -1574,7 +1553,7 @@ void main() {
       expectExists('test/widget_test.dart');
 
       final String rawPubspec = await projectDir.childFile('pubspec.yaml').readAsString();
-      expect(rawPubspec, contains('  config:\n    linux-gtk-default: gtk3'));
+      expect(rawPubspec, isNot(contains('linux-gtk-default:')));
 
       for (final FileSystemEntity file in projectDir.listSync(recursive: true)) {
         if (file is File && file.path.endsWith('.dart')) {
