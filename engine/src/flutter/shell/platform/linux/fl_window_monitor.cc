@@ -25,6 +25,10 @@ struct _FlWindowMonitor {
   void (*on_moved_to_rect)(int, int, int, int);
   void (*on_close)(void);
   void (*on_destroy)(void);
+
+#if FLUTTER_LINUX_GTK4
+  gboolean destroy_notified;
+#endif
 };
 
 G_DEFINE_TYPE(FlWindowMonitor, fl_window_monitor, G_TYPE_OBJECT)
@@ -45,6 +49,20 @@ static void destroy_cb(FlWindowMonitor* self) {
 }
 
 #if FLUTTER_LINUX_GTK4
+gboolean fl_window_monitor_is_window_destroyed(GtkWindow* window) {
+  g_return_val_if_fail(GTK_IS_WINDOW(window), FALSE);
+
+  GListModel* toplevels = gtk_window_get_toplevels();
+  for (guint i = 0; i < g_list_model_get_n_items(toplevels); i++) {
+    g_autoptr(GtkWindow) toplevel =
+        GTK_WINDOW(g_list_model_get_item(toplevels, i));
+    if (toplevel == window) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
 static void configure_notify_cb(FlWindowMonitor* self) {
   flutter::IsolateScope scope(self->isolate);
   self->on_configure();
@@ -53,6 +71,37 @@ static void configure_notify_cb(FlWindowMonitor* self) {
 static void toplevel_state_notify_cb(FlWindowMonitor* self) {
   flutter::IsolateScope scope(self->isolate);
   self->on_state_changed();
+}
+
+static void connect_surface_signals(FlWindowMonitor* self) {
+  GdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(self->window));
+  if (surface == nullptr || !GDK_IS_TOPLEVEL(surface)) {
+    return;
+  }
+
+  g_signal_connect_object(surface, "notify::width",
+                          G_CALLBACK(configure_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+  g_signal_connect_object(surface, "notify::height",
+                          G_CALLBACK(configure_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+  g_signal_connect_object(surface, "notify::state",
+                          G_CALLBACK(toplevel_state_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+}
+
+static void realize_cb(FlWindowMonitor* self) {
+  connect_surface_signals(self);
+}
+
+static void unrealize_cb(FlWindowMonitor* self) {
+  if (self->destroy_notified ||
+      !fl_window_monitor_is_window_destroyed(self->window)) {
+    return;
+  }
+
+  self->destroy_notified = TRUE;
+  destroy_cb(self);
 }
 
 static gboolean close_request_cb(FlWindowMonitor* self) {
@@ -142,21 +191,12 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
   self->on_close = on_close;
   self->on_destroy = on_destroy;
 #if FLUTTER_LINUX_GTK4
-  GdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(window));
-  if (surface != nullptr && GDK_IS_TOPLEVEL(surface)) {
-    g_signal_connect_object(surface, "notify::width",
-                            G_CALLBACK(configure_notify_cb), self,
-                            G_CONNECT_SWAPPED);
-    g_signal_connect_object(surface, "notify::height",
-                            G_CALLBACK(configure_notify_cb), self,
-                            G_CONNECT_SWAPPED);
-    g_signal_connect_object(surface, "notify::state",
-                            G_CALLBACK(toplevel_state_notify_cb), self,
-                            G_CONNECT_SWAPPED);
-  }
+  connect_surface_signals(self);
+  g_signal_connect_object(window, "realize", G_CALLBACK(realize_cb), self,
+                          G_CONNECT_SWAPPED);
   g_signal_connect_object(window, "close-request", G_CALLBACK(close_request_cb),
                           self, G_CONNECT_SWAPPED);
-  g_signal_connect_object(window, "unrealize", G_CALLBACK(destroy_cb), self,
+  g_signal_connect_object(window, "unrealize", G_CALLBACK(unrealize_cb), self,
                           G_CONNECT_SWAPPED);
 #else
   g_signal_connect_object(window, "configure-event",

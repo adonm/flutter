@@ -44,6 +44,11 @@ FlWindowMonitor* fl_window_monitor_new(
     void (*on_close)(void),
     void (*on_destroy)(void));
 
+#if FLUTTER_LINUX_GTK4
+// Returns whether GTK has removed @window from its toplevel registry.
+gboolean fl_window_monitor_is_window_destroyed(GtkWindow* window);
+#endif
+
 G_END_DECLS
 
 #endif  // FLUTTER_SHELL_PLATFORM_LINUX_FL_WINDOW_MONITOR_H_

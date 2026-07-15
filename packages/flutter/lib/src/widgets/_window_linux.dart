@@ -1104,10 +1104,10 @@ class _LinuxWindowing {
       return _createWindow(
         _createRegularWindow(
           engine.instance,
-          preferredSize != null,
+          preferredSize != null ? 1 : 0,
           preferredSize?.width.toInt() ?? 0,
           preferredSize?.height.toInt() ?? 0,
-          preferredConstraints != null,
+          preferredConstraints != null ? 1 : 0,
           preferredConstraints?.minWidth.toInt() ?? 0,
           preferredConstraints?.minHeight.toInt() ?? 0,
           preferredConstraints?.maxWidth.isInfinite ?? true
@@ -1117,8 +1117,8 @@ class _LinuxWindowing {
               ? _kMaxWindowDimensions
               : preferredConstraints!.maxHeight.toInt(),
           titleBuffer,
-          decorated,
-          resizable,
+          decorated ? 1 : 0,
+          resizable ? 1 : 0,
         ),
       );
     } finally {
@@ -1144,10 +1144,10 @@ class _LinuxWindowing {
         _createDialogWindow(
           engine.instance,
           parent?.instance ?? ffi.nullptr,
-          preferredSize != null,
+          preferredSize != null ? 1 : 0,
           preferredSize?.width.toInt() ?? 0,
           preferredSize?.height.toInt() ?? 0,
-          preferredConstraints != null,
+          preferredConstraints != null ? 1 : 0,
           preferredConstraints?.minWidth.toInt() ?? 0,
           preferredConstraints?.minHeight.toInt() ?? 0,
           preferredConstraints?.maxWidth.isInfinite ?? true
@@ -1157,8 +1157,8 @@ class _LinuxWindowing {
               ? _kMaxWindowDimensions
               : preferredConstraints!.maxHeight.toInt(),
           titleBuffer,
-          decorated,
-          resizable,
+          decorated ? 1 : 0,
+          resizable ? 1 : 0,
         ),
       );
     } finally {
@@ -1218,77 +1218,77 @@ class _LinuxWindowing {
     required int maxWidth,
     required int maxHeight,
   }) {
-    if (!_setWindowConstraints(window, minWidth, minHeight, maxWidth, maxHeight)) {
+    if (_setWindowConstraints(window, minWidth, minHeight, maxWidth, maxHeight) == 0) {
       throw UnsupportedError(_maximumConstraintsUnsupported);
     }
   }
 
   static void setWindowMinimized(ffi.Pointer<ffi.NativeType> window, bool minimized) {
-    _setWindowMinimized(window, minimized);
+    _setWindowMinimized(window, minimized ? 1 : 0);
   }
 
   @ffi.Native<
     ffi.Pointer<_LinuxWindowingWindowResult> Function(
       ffi.Pointer<ffi.NativeType>,
-      ffi.Bool,
       ffi.Int,
       ffi.Int,
-      ffi.Bool,
+      ffi.Int,
+      ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Pointer<ffi.Uint8>,
-      ffi.Bool,
-      ffi.Bool,
+      ffi.Int,
+      ffi.Int,
     )
   >(symbol: 'fl_linux_windowing_create_regular_window')
   external static ffi.Pointer<_LinuxWindowingWindowResult> _createRegularWindow(
     ffi.Pointer<ffi.NativeType> engine,
-    bool hasPreferredSize,
+    int hasPreferredSize,
     int preferredWidth,
     int preferredHeight,
-    bool hasPreferredConstraints,
+    int hasPreferredConstraints,
     int minWidth,
     int minHeight,
     int maxWidth,
     int maxHeight,
     ffi.Pointer<ffi.Uint8> title,
-    bool decorated,
-    bool resizable,
+    int decorated,
+    int resizable,
   );
 
   @ffi.Native<
     ffi.Pointer<_LinuxWindowingWindowResult> Function(
       ffi.Pointer<ffi.NativeType>,
       ffi.Pointer<ffi.NativeType>,
-      ffi.Bool,
       ffi.Int,
       ffi.Int,
-      ffi.Bool,
+      ffi.Int,
+      ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Int,
       ffi.Pointer<ffi.Uint8>,
-      ffi.Bool,
-      ffi.Bool,
+      ffi.Int,
+      ffi.Int,
     )
   >(symbol: 'fl_linux_windowing_create_dialog_window')
   external static ffi.Pointer<_LinuxWindowingWindowResult> _createDialogWindow(
     ffi.Pointer<ffi.NativeType> engine,
     ffi.Pointer<ffi.NativeType> parent,
-    bool hasPreferredSize,
+    int hasPreferredSize,
     int preferredWidth,
     int preferredHeight,
-    bool hasPreferredConstraints,
+    int hasPreferredConstraints,
     int minWidth,
     int minHeight,
     int maxWidth,
     int maxHeight,
     ffi.Pointer<ffi.Uint8> title,
-    bool decorated,
-    bool resizable,
+    int decorated,
+    int resizable,
   );
 
   @ffi.Native<ffi.Int Function()>(symbol: 'fl_linux_windowing_get_gtk_major_version')
@@ -1318,10 +1318,10 @@ class _LinuxWindowing {
   )
   external static void _setWindowSize(ffi.Pointer<ffi.NativeType> window, int width, int height);
 
-  @ffi.Native<ffi.Bool Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int, ffi.Int, ffi.Int)>(
+  @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int, ffi.Int, ffi.Int)>(
     symbol: 'fl_linux_windowing_set_window_constraints',
   )
-  external static bool _setWindowConstraints(
+  external static int _setWindowConstraints(
     ffi.Pointer<ffi.NativeType> window,
     int minWidth,
     int minHeight,
@@ -1329,10 +1329,10 @@ class _LinuxWindowing {
     int maxHeight,
   );
 
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Bool)>(
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int)>(
     symbol: 'fl_linux_windowing_set_window_minimized',
   )
-  external static void _setWindowMinimized(ffi.Pointer<ffi.NativeType> window, bool minimized);
+  external static void _setWindowMinimized(ffi.Pointer<ffi.NativeType> window, int minimized);
 }
 
 enum _LinuxWindowingWindowState { minimized, maximized, fullscreen }

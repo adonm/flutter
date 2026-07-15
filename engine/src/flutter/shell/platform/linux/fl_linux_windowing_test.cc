@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/platform/linux/fl_linux_windowing.h"
+#include "flutter/shell/platform/linux/fl_window_monitor.h"
 
 #include "flutter/shell/platform/linux/testing/linux_test.h"
 #if !FLUTTER_LINUX_GTK4
@@ -56,6 +57,30 @@ TEST_F(FlLinuxWindowingTest, GetsRealizedSurfaceSize) {
   fl_linux_windowing_get_window_size(window, &width, &height);
   EXPECT_EQ(width, gdk_surface_get_width(surface));
   EXPECT_EQ(height, gdk_surface_get_height(surface));
+}
+
+TEST_F(FlLinuxWindowingTest, DistinguishesUnrealizeFromWindowDestruction) {
+  g_autoptr(GtkWindow) window = GTK_WINDOW(
+      g_object_ref_sink(g_object_new(gtk_window_get_type(), nullptr)));
+  gint destroy_callbacks = 0;
+  g_signal_connect(window, "unrealize",
+                   G_CALLBACK(+[](GtkWindow* window, gpointer user_data) {
+                     if (fl_window_monitor_is_window_destroyed(window)) {
+                       (*static_cast<gint*>(user_data))++;
+                     }
+                   }),
+                   &destroy_callbacks);
+
+  gtk_widget_realize(GTK_WIDGET(window));
+  gtk_widget_unrealize(GTK_WIDGET(window));
+  EXPECT_EQ(destroy_callbacks, 0);
+
+  gtk_widget_realize(GTK_WIDGET(window));
+  fl_linux_windowing_destroy_window(window);
+  EXPECT_EQ(destroy_callbacks, 1);
+
+  fl_linux_windowing_destroy_window(window);
+  EXPECT_EQ(destroy_callbacks, 1);
 }
 #endif
 
