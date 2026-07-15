@@ -57,6 +57,29 @@ The GTK4 desktop-drop and lifecycle work in
 is a useful plugin-porting example, but it does not cover the Yaru dependency
 graph above.
 
+### Reproducible Validation Refs
+
+The following staging refs are pinned by the Zuko and Vixen validation
+branches. Each plugin branch starts at the listed upstream head and retains a
+GTK3 fallback when `FLUTTER_LINUX_GTK4` is not defined. These are validation
+refs for this Flutter change, not published plugin releases or substitutes for
+upstream review.
+
+| Component | Upstream base | Validation ref |
+|---|---|---|
+| `gtk` | [`canonical/gtk.dart@0734034`](https://github.com/canonical/gtk.dart/commit/0734034c1191a8df274800cbc7f8ab521757f108) | [`adonm/gtk.dart@43d04c7`](https://github.com/adonm/gtk.dart/commit/43d04c70db4b17a575ef2ffb4fc3569ca3ce81bf) |
+| `screen_retriever_linux` | [`leanflutter/screen_retriever@5fc2b57`](https://github.com/leanflutter/screen_retriever/commit/5fc2b573292e559edb4b2bb74680db8e6c0ca65f) | [`adonm/screen_retriever@b8cf0c4`](https://github.com/adonm/screen_retriever/commit/b8cf0c47cec09b2b373b38b985678b05a474cbb5) |
+| `window_manager` | [`leanflutter/window_manager@4080b59`](https://github.com/leanflutter/window_manager/commit/4080b59c0b1084c6085f1613c660382cd164ad76) | [`adonm/window_manager@0b2d954`](https://github.com/adonm/window_manager/commit/0b2d9542cb7bf2296ac40ad9005eb5ce7852e4a8) |
+| `yaru_window_linux` | [`ubuntu/yaru_window.dart@27ec2b1`](https://github.com/ubuntu/yaru_window.dart/commit/27ec2b14bb9bd180d2b979a91efaefb8afd86814) | [`adonm/yaru_window.dart@630dd21`](https://github.com/adonm/yaru_window.dart/commit/630dd21775906a298838ed92b5985a1cd460524b) |
+| `url_launcher_linux` | [`flutter/packages@ad9840e`](https://github.com/flutter/packages/commit/ad9840e31554ffb6bc356919d30e8be37f03bdaf) | [`adonm/packages@ac83d62`](https://github.com/adonm/packages/commit/ac83d62d91e121cbe80e2f44895c7b52c205572e) |
+| Zuko | [`adonm/zuko@19a5aa4`](https://github.com/adonm/zuko/commit/19a5aa4260b1dfbb5a7a90d2a197bb8a3948712a) | [`adonm/zuko@0109bad`](https://github.com/adonm/zuko/commit/0109bada14b21e939bd3aa817b57f9b7cbf6121e) |
+| Vixen | [`adonm/vixen@7fc7219`](https://github.com/adonm/vixen/commit/7fc721991912b74ebea10a325e5682a4990a52a8) | [`adonm/vixen@275b598`](https://github.com/adonm/vixen/commit/275b598d60ef853ffbc740024d7113f4c6e66660) |
+
+The application refs select GTK4 as their project default and use immutable
+Git dependency overrides for the plugin refs. Zuko's GTK4 bundle includes
+`libghostty` and its Iroh native asset. Vixen's GTK4 bundle includes its Rust
+FFI library and custom Wayland texture runner.
+
 ## Existing Runners
 
 Do not only change `pkg_check_modules` in an existing GTK3 runner. GTK4 removed
