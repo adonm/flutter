@@ -8,7 +8,6 @@ import 'package:flutter_tools/src/base/config.dart';
 import 'package:flutter_tools/src/base/exit.dart';
 import 'package:flutter_tools/src/base/file_system.dart';
 import 'package:flutter_tools/src/base/logger.dart';
-import 'package:flutter_tools/src/base/process.dart';
 import 'package:flutter_tools/src/base/platform.dart';
 import 'package:flutter_tools/src/build_info.dart';
 import 'package:flutter_tools/src/build_system/build_system.dart';
@@ -88,7 +87,7 @@ void main() {
     expect(command.buildInfo?.dartDefines, contains('$kLinuxGtkDartDefine=gtk4'));
   });
 
-  final MemoryFileSystem projectFileSystem = MemoryFileSystem.test();
+  final projectFileSystem = MemoryFileSystem.test();
 
   testUsingContext(
     'linux-gtk reads project default from manifest',
@@ -105,7 +104,7 @@ flutter:
 ''');
       projectFileSystem.currentDirectory = '/package';
 
-      final command = FakeBuildInfoCommand();
+      final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
       final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
       await commandRunner.run(<String>['fake']);
@@ -119,8 +118,8 @@ flutter:
     },
   );
 
-  final MemoryFileSystem globalConfigFileSystem = MemoryFileSystem.test();
-  final Config globalConfig = Config.test(
+  final globalConfigFileSystem = MemoryFileSystem.test();
+  final globalConfig = Config.test(
     name: Config.kFlutterSettings,
     directory: globalConfigFileSystem.directory('/'),
   );
@@ -137,7 +136,7 @@ dependencies:
   testUsingContext(
     'linux-gtk reads global config default when project does not declare one',
     () async {
-      final command = FakeBuildInfoCommand();
+    final command = FakeBuildInfoCommand(addLinuxGtkOption: true);
       final CommandRunner<void> commandRunner = createTestCommandRunner(command);
 
       await commandRunner.run(<String>['fake']);
@@ -343,7 +342,11 @@ class FakeBuildInfoCommand extends FlutterCommand {
     addDartObfuscationOption();
     usesDartDefineOption();
     if (addLinuxGtkOption) {
-      argParser.addOption('linux-gtk', allowed: <String>['gtk3', 'gtk4']);
+      argParser.addOption(
+        'linux-gtk',
+        defaultsTo: 'gtk3',
+        allowed: <String>['gtk3', 'gtk4'],
+      );
     }
   }
 

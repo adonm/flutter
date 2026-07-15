@@ -15,9 +15,9 @@ declare_args() {
   use_default_linux_sysroot = true
 
   # Select the Linux x64 sysroot variant.
-  # Keep trixie as the default on amd64, but allow switching back to bullseye
-  # for comparison or compatibility testing.
-  linux_x64_sysroot_variant = "trixie"
+  # Keep bullseye as the default provisioned by gclient hooks. Trixie is
+  # available for explicit compatibility testing.
+  linux_x64_sysroot_variant = "bullseye"
 }
 
 if (current_toolchain == default_toolchain && target_sysroot != "") {

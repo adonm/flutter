@@ -30,6 +30,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(SCRIPT_DIR)))
 VALID_ARCHS = ("amd64", "i386", "armhf", "arm64", "mipsel", "mips64el",
                "ppc64el", "riscv64")
+VALID_PLATFORMS = ("bullseye", "trixie")
 ARCH_TRANSLATIONS = {
     "x64": "amd64",
     "x86": "i386",
@@ -70,6 +71,11 @@ def main(args):
                       help="The location of sysroots.json file")
     parser.add_option("--arch",
                       help="Sysroot architecture: %s" % ", ".join(VALID_ARCHS))
+    parser.add_option("--platform",
+                      type="choice",
+                      choices=VALID_PLATFORMS,
+                      help="Debian sysroot platform: %s" %
+                      ", ".join(VALID_PLATFORMS))
     parser.add_option(
         "--all",
         action="store_true",
@@ -83,13 +89,17 @@ def main(args):
         sysroots_json_path = DEFAULT_SYSROOTS_PATH
     if options.arch:
         arch = ARCH_TRANSLATIONS.get(options.arch, options.arch)
-        InstallSysroot(sysroots_json_path, DEFAULT_TARGET_PLATFORMS[arch],
-                       arch)
+        target_platform = options.platform or DEFAULT_TARGET_PLATFORMS[arch]
+        InstallSysroot(sysroots_json_path, target_platform, arch)
     elif options.all:
+        if options.platform:
+            parser.error("--platform requires --arch")
         for arch in VALID_ARCHS:
             InstallSysroot(sysroots_json_path, DEFAULT_TARGET_PLATFORMS[arch],
                            arch)
     else:
+        if options.platform:
+            parser.error("--platform requires --arch")
         print("You much specify one of the options.")
         return 1
     return 0

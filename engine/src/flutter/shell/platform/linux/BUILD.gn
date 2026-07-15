@@ -580,6 +580,7 @@ executable("flutter_linux_gtk4_unittests") {
     ":flutter_linux_fixtures",
     ":flutter_linux_gschemas",
     ":flutter_linux_sources_gtk4",
+    "//flutter/impeller/testing:impeller_unittest_suite",
     "//flutter/runtime:libdart",
     "//flutter/shell/platform/common:common_cpp_enums",
     "//flutter/shell/platform/embedder:embedder_headers",
@@ -622,6 +623,7 @@ zip_bundle("flutter_gtk") {
   output = "${prefix}${full_target_platform_name}-flutter-gtk.zip"
   deps = [
     ":flutter_linux_gtk",
+    ":flutter_linux_gtk4",
     ":publish_headers_linux",
     "$dart_src/runtime/bin:gen_snapshot",
   ]
@@ -639,6 +641,10 @@ zip_bundle("flutter_gtk") {
     {
       source = "$root_build_dir/libflutter_${host_os}_gtk.so"
       destination = "libflutter_${host_os}_gtk.so"
+    },
+    {
+      source = "$root_build_dir/libflutter_${host_os}_gtk4.so"
+      destination = "libflutter_${host_os}_gtk4.so"
     },
     {
       source = "$root_build_dir/gen_snapshot"

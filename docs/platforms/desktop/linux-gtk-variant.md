@@ -46,6 +46,9 @@ The Linux GTK variant is selected at build time through the toolchain, with
 For native popup and multi-window demos, see
 [Linux Native Popup And Multi-Window API](linux-popup-windowing.md).
 
+For the current third-party plugin migration status and downstream application
+checklist, see [Linux GTK4 Downstream Compatibility](linux-gtk4-downstream.md).
+
 Supported inputs on this branch:
 
 ```yaml

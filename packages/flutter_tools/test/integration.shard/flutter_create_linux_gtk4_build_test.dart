@@ -21,7 +21,12 @@ void main() {
     Cache.disableLocking();
     await ensureFlutterToolsSnapshot();
     tempDir = createResolvedTempDirectorySync('create_linux_gtk4_build_test.');
-    await _runFlutterSnapshot(<String>['create', '--platforms=linux', 'hello'], tempDir);
+    await _runFlutterSnapshot(<String>[
+      'create',
+      '--platforms=linux',
+      '--linux-gtk=gtk4',
+      'hello',
+    ], tempDir);
     projectRoot = tempDir.childDirectory('hello');
   });
 
@@ -42,12 +47,12 @@ void main() {
 
       await _runFlutterSnapshot(<String>['build', 'linux', '--no-pub'], projectRoot);
 
-      final String arch = Abi.current() == Abi.linuxArm64 ? 'arm64' : 'x64';
+      final arch = Abi.current() == Abi.linuxArm64 ? 'arm64' : 'x64';
       final File executable = fileSystem.file(
         fileSystem.path.join(
           projectRoot.path,
           'build',
-          'linux',
+          'linux-gtk4',
           arch,
           'release',
           'bundle',
@@ -79,7 +84,7 @@ Future<void> _runFlutterSnapshot(List<String> flutterCommandArgs, Directory work
     'flutter_tools.snapshot',
   );
 
-  final List<String> args = <String>[
+  final args = <String>[
     dartBinary,
     flutterToolsSnapshotPath,
     ...getLocalEngineArguments(),
