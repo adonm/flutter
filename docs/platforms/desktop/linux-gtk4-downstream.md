@@ -31,8 +31,9 @@ A GTK4-compatible Linux plugin must:
 5. fail at configure time instead of silently linking GTK3 into a GTK4 app; and
 6. test both variants if the same package continues to support GTK3.
 
-The generated GTK4 plugin template demonstrates the expected CMake and source
-layout. Existing plugin packages still require individual ports.
+The generated Linux plugin template links the selected GTK interface exported
+by the application runner. Existing plugin packages still require individual
+ports.
 
 ## Zuko And Vixen Acceptance Graph
 
@@ -44,11 +45,11 @@ stack.
 |---|---|---|
 | `flterm` / `libghostty` | GTK-independent | Validate native assets and rendering with the GTK4 runner. |
 | Yaru Flutter themes and widgets | Mostly Dart | Keep the Dart UI; port its transitive Linux window plugins. |
-| `gtk` | GTK3 native plugin | Add a dual GTK3/GTK4 implementation. |
-| `screen_retriever_linux` | GTK3 native plugin | Port monitor enumeration and notifications to GTK4. |
-| `window_manager` | GTK3 native plugin | Port window lookup, state, movement, sizing, and signal handling. |
-| `yaru_window_linux` | GTK3 native plugin | Port title-bar/window controls or replace its native operations with the GTK4 window-manager path. |
-| `url_launcher_linux` | GTK4 fork exists | Start from [`richyo-codes/packages`](https://github.com/richyo-codes/packages/tree/feat-add-gtk4-support-url-launcher-v2/packages/url_launcher/url_launcher_linux) and synchronize it with the current package release. |
+| `gtk` | Dual GTK validation ref | Detect the process GTK major and use correctly typed GTK3/GTK4 icon lookup. |
+| `screen_retriever_linux` | Dual GTK validation ref | Validate X11 monitor/cursor behavior and explicit Wayland limitations. |
+| `window_manager` | Dual GTK validation ref | Validate GTK4 capability errors, events, sizing, and lifecycle handling. |
+| `yaru_window_linux` | Dual GTK validation ref | Validate GTK4 title-bar state, CSS, input, and toplevel lifecycle. |
+| `url_launcher_linux` | Dual GTK validation ref | Preserve parent launch context and synchronous error reporting on GTK4. |
 | `flutter_secure_storage_linux` | No direct GTK UI | Compile-test its GLib/libsecret and Flutter registrar usage with GTK4. |
 | Zuko native transport and Vixen FFI | GTK-independent | Validate their native-asset build hooks and bundled libraries. |
 
@@ -67,11 +68,11 @@ upstream review.
 
 | Component | Upstream base | Validation ref |
 |---|---|---|
-| `gtk` | [`canonical/gtk.dart@0734034`](https://github.com/canonical/gtk.dart/commit/0734034c1191a8df274800cbc7f8ab521757f108) | [`adonm/gtk.dart@43d04c7`](https://github.com/adonm/gtk.dart/commit/43d04c70db4b17a575ef2ffb4fc3569ca3ce81bf) |
-| `screen_retriever_linux` | [`leanflutter/screen_retriever@5fc2b57`](https://github.com/leanflutter/screen_retriever/commit/5fc2b573292e559edb4b2bb74680db8e6c0ca65f) | [`adonm/screen_retriever@b8cf0c4`](https://github.com/adonm/screen_retriever/commit/b8cf0c47cec09b2b373b38b985678b05a474cbb5) |
-| `window_manager` | [`leanflutter/window_manager@4080b59`](https://github.com/leanflutter/window_manager/commit/4080b59c0b1084c6085f1613c660382cd164ad76) | [`adonm/window_manager@0b2d954`](https://github.com/adonm/window_manager/commit/0b2d9542cb7bf2296ac40ad9005eb5ce7852e4a8) |
-| `yaru_window_linux` | [`ubuntu/yaru_window.dart@27ec2b1`](https://github.com/ubuntu/yaru_window.dart/commit/27ec2b14bb9bd180d2b979a91efaefb8afd86814) | [`adonm/yaru_window.dart@630dd21`](https://github.com/adonm/yaru_window.dart/commit/630dd21775906a298838ed92b5985a1cd460524b) |
-| `url_launcher_linux` | [`flutter/packages@ad9840e`](https://github.com/flutter/packages/commit/ad9840e31554ffb6bc356919d30e8be37f03bdaf) | [`adonm/packages@ac83d62`](https://github.com/adonm/packages/commit/ac83d62d91e121cbe80e2f44895c7b52c205572e) |
+| `gtk` | [`canonical/gtk.dart@0734034`](https://github.com/canonical/gtk.dart/commit/0734034c1191a8df274800cbc7f8ab521757f108) | [`adonm/gtk.dart@8f9a5db`](https://github.com/adonm/gtk.dart/commit/8f9a5db741176a25657fbf6fecb2a90df8741e48) |
+| `screen_retriever_linux` | [`leanflutter/screen_retriever@5fc2b57`](https://github.com/leanflutter/screen_retriever/commit/5fc2b573292e559edb4b2bb74680db8e6c0ca65f) | [`adonm/screen_retriever@a4d8f71`](https://github.com/adonm/screen_retriever/commit/a4d8f718ecbee78207945aa87ded0f97e2509c87) |
+| `window_manager` | [`leanflutter/window_manager@4080b59`](https://github.com/leanflutter/window_manager/commit/4080b59c0b1084c6085f1613c660382cd164ad76) | [`adonm/window_manager@3acfbdd`](https://github.com/adonm/window_manager/commit/3acfbdd1624202edfe03ccc7d4eae548b6c18459) |
+| `yaru_window_linux` | [`ubuntu/yaru_window.dart@27ec2b1`](https://github.com/ubuntu/yaru_window.dart/commit/27ec2b14bb9bd180d2b979a91efaefb8afd86814) | [`adonm/yaru_window.dart@4f22de3`](https://github.com/adonm/yaru_window.dart/commit/4f22de320ea0270662506900e1ae070eb7b6cb13) |
+| `url_launcher_linux` | [`flutter/packages@9f95026`](https://github.com/flutter/packages/commit/9f950268cf0fa09c4fd914a6d389e90e3aa9d791) | [`adonm/packages@0ab7672`](https://github.com/adonm/packages/commit/0ab767292efb16fadbfec3c7c119380343b4fbd8) |
 | Zuko | [`adonm/zuko@19a5aa4`](https://github.com/adonm/zuko/commit/19a5aa4260b1dfbb5a7a90d2a197bb8a3948712a) | [`adonm/zuko@0109bad`](https://github.com/adonm/zuko/commit/0109bada14b21e939bd3aa817b57f9b7cbf6121e) |
 | Vixen | [`adonm/vixen@7fc7219`](https://github.com/adonm/vixen/commit/7fc721991912b74ebea10a325e5682a4990a52a8) | [`adonm/vixen@275b598`](https://github.com/adonm/vixen/commit/275b598d60ef853ffbc740024d7113f4c6e66660) |
 
@@ -121,8 +122,8 @@ Use Flutter's downloaded engine sysroot for engine compilation. A generic
 distribution container does not replace that sysroot. Use downstream packaging
 environments for the application-level checks:
 
-- the pinned Freedesktop build environment for Zuko;
-- the pinned GNOME/Flatpak SDK for Vixen; and
+- the pinned GNOME 50 build and Flatpak environment for Zuko;
+- the pinned GNOME build environment for Vixen; and
 - a native Wayland session for input, IME, window-state, accessibility, and
   renderer smoke tests.
 
