@@ -4,6 +4,8 @@
 
 #include "flutter/shell/platform/linux/fl_linux_windowing.h"
 
+#include "flutter/shell/platform/linux/fl_gtk.h"
+
 static void set_geometry_hints(GtkWindow* window,
                                gboolean has_preferred_constraints,
                                gint min_width,
@@ -141,4 +143,111 @@ G_MODULE_EXPORT FlLinuxWindowingWindow* fl_linux_windowing_create_dialog_window(
                        preferred_width, preferred_height,
                        has_preferred_constraints, min_width, min_height,
                        max_width, max_height, title, decorated, resizable);
+}
+
+G_MODULE_EXPORT void fl_linux_windowing_destroy_window(GtkWindow* window) {
+  g_return_if_fail(GTK_IS_WINDOW(window));
+#if FLUTTER_LINUX_GTK4
+  gtk_window_destroy(window);
+#else
+  gtk_widget_destroy(GTK_WIDGET(window));
+#endif
+}
+
+G_MODULE_EXPORT void fl_linux_windowing_get_window_size(GtkWindow* window,
+                                                        gint* width,
+                                                        gint* height) {
+  g_return_if_fail(GTK_IS_WINDOW(window));
+  g_return_if_fail(width != nullptr);
+  g_return_if_fail(height != nullptr);
+#if FLUTTER_LINUX_GTK4
+  gtk_window_get_default_size(window, width, height);
+#else
+  gtk_window_get_size(window, width, height);
+#endif
+}
+
+G_MODULE_EXPORT guint fl_linux_windowing_get_window_state(GtkWindow* window) {
+  g_return_val_if_fail(GTK_IS_WINDOW(window), 0);
+
+  guint result = 0;
+#if FLUTTER_LINUX_GTK4
+  FlGdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(window));
+  if (surface == nullptr || !GDK_IS_TOPLEVEL(surface)) {
+    return result;
+  }
+  GdkToplevelState state = gdk_toplevel_get_state(GDK_TOPLEVEL(surface));
+  if ((state & GDK_TOPLEVEL_STATE_MINIMIZED) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_MINIMIZED;
+  }
+  if ((state & GDK_TOPLEVEL_STATE_MAXIMIZED) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_MAXIMIZED;
+  }
+  if ((state & GDK_TOPLEVEL_STATE_FULLSCREEN) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_FULLSCREEN;
+  }
+#else
+  GdkWindow* gdk_window = gtk_widget_get_window(GTK_WIDGET(window));
+  if (gdk_window == nullptr) {
+    return result;
+  }
+  GdkWindowState state = gdk_window_get_state(gdk_window);
+  if ((state & GDK_WINDOW_STATE_ICONIFIED) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_MINIMIZED;
+  }
+  if ((state & GDK_WINDOW_STATE_MAXIMIZED) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_MAXIMIZED;
+  }
+  if ((state & GDK_WINDOW_STATE_FULLSCREEN) != 0) {
+    result |= FL_LINUX_WINDOWING_WINDOW_STATE_FULLSCREEN;
+  }
+#endif
+  return result;
+}
+
+G_MODULE_EXPORT void fl_linux_windowing_set_window_size(GtkWindow* window,
+                                                        gint width,
+                                                        gint height) {
+  g_return_if_fail(GTK_IS_WINDOW(window));
+#if FLUTTER_LINUX_GTK4
+  gtk_window_set_default_size(window, width, height);
+#else
+  gtk_window_resize(window, width, height);
+#endif
+}
+
+G_MODULE_EXPORT gboolean
+fl_linux_windowing_set_window_constraints(GtkWindow* window,
+                                          gint min_width,
+                                          gint min_height,
+                                          gint max_width,
+                                          gint max_height) {
+  g_return_val_if_fail(GTK_IS_WINDOW(window), FALSE);
+#if FLUTTER_LINUX_GTK4
+  if (max_width != G_MAXINT || max_height != G_MAXINT) {
+    return FALSE;
+  }
+  gtk_widget_set_size_request(GTK_WIDGET(window), min_width, min_height);
+#else
+  GdkGeometry geometry = {};
+  geometry.min_width = min_width;
+  geometry.min_height = min_height;
+  geometry.max_width = max_width;
+  geometry.max_height = max_height;
+  gtk_window_set_geometry_hints(
+      window, nullptr, &geometry,
+      static_cast<GdkWindowHints>(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
+#endif
+  return TRUE;
+}
+
+G_MODULE_EXPORT void fl_linux_windowing_set_window_minimized(
+    GtkWindow* window,
+    gboolean minimized) {
+  g_return_if_fail(GTK_IS_WINDOW(window));
+#if FLUTTER_LINUX_GTK4
+  minimized ? gtk_window_minimize(window) : gtk_window_unminimize(window);
+#else
+  minimized ? gtk_window_iconify(window) : gtk_window_deiconify(window);
+#endif
 }

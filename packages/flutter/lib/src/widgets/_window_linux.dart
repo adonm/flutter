@@ -409,16 +409,16 @@ class RegularWindowControllerLinux extends RegularWindowController
 
   @override
   @internal
-  bool get isMaximized => _window.getWindow().getState().contains(_GdkWindowState.maximized);
+  bool get isMaximized => _window.hasState(_LinuxWindowingWindowState.maximized);
 
   @override
   @internal
   // NOTE: On Wayland this is never set, see https://gitlab.gnome.org/GNOME/gtk/-/issues/67
-  bool get isMinimized => _window.getWindow().getState().contains(_GdkWindowState.iconified);
+  bool get isMinimized => _window.hasState(_LinuxWindowingWindowState.minimized);
 
   @override
   @internal
-  bool get isFullscreen => _window.getWindow().getState().contains(_GdkWindowState.fullscreen);
+  bool get isFullscreen => _window.hasState(_LinuxWindowingWindowState.fullscreen);
 
   @override
   @internal
@@ -622,7 +622,7 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
   @override
   @internal
   // NOTE: On Wayland this is never set, see https://gitlab.gnome.org/GNOME/gtk/-/issues/67
-  bool get isMinimized => _window.getWindow().getState().contains(_GdkWindowState.iconified);
+  bool get isMinimized => _window.hasState(_LinuxWindowingWindowState.minimized);
 
   @override
   @internal
@@ -1087,6 +1087,9 @@ final class _LinuxWindowingWindow {
 class _LinuxWindowing {
   static int get gtkMajorVersion => _getGtkMajorVersion();
 
+  static const String _maximumConstraintsUnsupported =
+      'Maximum window constraints are not supported by GTK4.';
+
   static _LinuxWindowingWindow createRegularWindow(
     _FlEngine engine, {
     Size? preferredSize,
@@ -1095,6 +1098,7 @@ class _LinuxWindowing {
     required bool decorated,
     required bool resizable,
   }) {
+    _validateConstraints(preferredConstraints);
     final ffi.Pointer<ffi.Uint8> titleBuffer = title != null ? _stringToNative(title) : ffi.nullptr;
     try {
       return _createWindow(
@@ -1133,6 +1137,7 @@ class _LinuxWindowing {
     required bool decorated,
     required bool resizable,
   }) {
+    _validateConstraints(preferredConstraints);
     final ffi.Pointer<ffi.Uint8> titleBuffer = title != null ? _stringToNative(title) : ffi.nullptr;
     try {
       return _createWindow(
@@ -1176,6 +1181,50 @@ class _LinuxWindowing {
     } finally {
       _gFree(result.cast<ffi.NativeType>());
     }
+  }
+
+  static void _validateConstraints(BoxConstraints? constraints) {
+    if (gtkMajorVersion >= 4 &&
+        constraints != null &&
+        (constraints.hasBoundedWidth || constraints.hasBoundedHeight)) {
+      throw UnsupportedError(_maximumConstraintsUnsupported);
+    }
+  }
+
+  static void destroyWindow(ffi.Pointer<ffi.NativeType> window) {
+    _destroyWindow(window);
+  }
+
+  static Size getWindowSize(ffi.Pointer<ffi.NativeType> window) {
+    final ffi.Pointer<ffi.Int> size = _gMalloc0(ffi.sizeOf<ffi.Int>() * 2).cast<ffi.Int>();
+    _getWindowSize(window, size.elementAt(0), size.elementAt(1));
+    final result = Size(size[0].toDouble(), size[1].toDouble());
+    _gFree(size);
+    return result;
+  }
+
+  static bool hasWindowState(ffi.Pointer<ffi.NativeType> window, _LinuxWindowingWindowState state) {
+    return (_getWindowState(window) & (1 << state.index)) != 0;
+  }
+
+  static void setWindowSize(ffi.Pointer<ffi.NativeType> window, int width, int height) {
+    _setWindowSize(window, width, height);
+  }
+
+  static void setWindowConstraints(
+    ffi.Pointer<ffi.NativeType> window, {
+    required int minWidth,
+    required int minHeight,
+    required int maxWidth,
+    required int maxHeight,
+  }) {
+    if (!_setWindowConstraints(window, minWidth, minHeight, maxWidth, maxHeight)) {
+      throw UnsupportedError(_maximumConstraintsUnsupported);
+    }
+  }
+
+  static void setWindowMinimized(ffi.Pointer<ffi.NativeType> window, bool minimized) {
+    _setWindowMinimized(window, minimized);
   }
 
   @ffi.Native<
@@ -1244,7 +1293,49 @@ class _LinuxWindowing {
 
   @ffi.Native<ffi.Int Function()>(symbol: 'fl_linux_windowing_get_gtk_major_version')
   external static int _getGtkMajorVersion();
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(
+    symbol: 'fl_linux_windowing_destroy_window',
+  )
+  external static void _destroyWindow(ffi.Pointer<ffi.NativeType> window);
+
+  @ffi.Native<
+    ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Pointer<ffi.Int>, ffi.Pointer<ffi.Int>)
+  >(symbol: 'fl_linux_windowing_get_window_size')
+  external static void _getWindowSize(
+    ffi.Pointer<ffi.NativeType> window,
+    ffi.Pointer<ffi.Int> width,
+    ffi.Pointer<ffi.Int> height,
+  );
+
+  @ffi.Native<ffi.Uint32 Function(ffi.Pointer<ffi.NativeType>)>(
+    symbol: 'fl_linux_windowing_get_window_state',
+  )
+  external static int _getWindowState(ffi.Pointer<ffi.NativeType> window);
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int)>(
+    symbol: 'fl_linux_windowing_set_window_size',
+  )
+  external static void _setWindowSize(ffi.Pointer<ffi.NativeType> window, int width, int height);
+
+  @ffi.Native<ffi.Bool Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int, ffi.Int, ffi.Int)>(
+    symbol: 'fl_linux_windowing_set_window_constraints',
+  )
+  external static bool _setWindowConstraints(
+    ffi.Pointer<ffi.NativeType> window,
+    int minWidth,
+    int minHeight,
+    int maxWidth,
+    int maxHeight,
+  );
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Bool)>(
+    symbol: 'fl_linux_windowing_set_window_minimized',
+  )
+  external static void _setWindowMinimized(ffi.Pointer<ffi.NativeType> window, bool minimized);
 }
+
+enum _LinuxWindowingWindowState { minimized, maximized, fullscreen }
 
 // The following classes are thin wrappers around the corresponding GTK/GDK
 // objects, with only the methods we need implemented. The method signatures
@@ -1258,28 +1349,6 @@ enum _GtkWindowType {
   toplevel,
   // ignore: unused_field
   popup,
-}
-
-/// States a toplevel window can be in. Matches the order of the GdkWindowState
-/// enum in gdk/gdkwindow.h, except these are bit positions when passed to GTK.
-enum _GdkWindowState {
-  withdrawn,
-  iconified,
-  maximized,
-  sticky,
-  fullscreen,
-  above,
-  below,
-  focused,
-  tiled,
-  topTiled,
-  topResizable,
-  rightTiled,
-  rightResizable,
-  bottomTiled,
-  bottomResizable,
-  leftTiled,
-  leftResizable,
 }
 
 /// Hints for the window manager on how to treat a window. Matches the
@@ -1436,11 +1505,6 @@ class _GtkWidget extends _GObject {
     return result;
   }
 
-  /// Destroy the widget.
-  void destroy() {
-    _gtkWindowDestroy(instance);
-  }
-
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_realize')
   external static void _gtkWidgetRealize(ffi.Pointer<ffi.NativeType> widget);
 
@@ -1453,9 +1517,6 @@ class _GtkWidget extends _GObject {
   external static ffi.Pointer<ffi.NativeType> _gtkWidgetGetWindow(
     ffi.Pointer<ffi.NativeType> widget,
   );
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_destroy')
-  external static void _gtkWindowDestroy(ffi.Pointer<ffi.NativeType> widget);
 
   @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_get_scale_factor')
   external static int _gtkWidgetGetScaleFactor(ffi.Pointer<ffi.NativeType> widget);
@@ -1484,19 +1545,6 @@ class _GtkWidget extends _GObject {
 class _GdkWindow extends _GObject {
   /// Creates a wrapper to an existing [GdkWindow] in [instance].
   const _GdkWindow(super.instance);
-
-  /// Gets the window state.
-  Set<_GdkWindowState> getState() {
-    final int stateBits = _gdkWindowGetState(instance);
-    final states = <_GdkWindowState>{};
-    for (final _GdkWindowState state in _GdkWindowState.values) {
-      if ((stateBits & (1 << state.index)) != 0) {
-        states.add(state);
-      }
-    }
-
-    return states;
-  }
 
   /// Move the window to place it relative to the given rectangle according to the specified anchors.
   void moveToRect({
@@ -1533,9 +1581,6 @@ class _GdkWindow extends _GObject {
     );
     _gFree(rect);
   }
-
-  @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gdk_window_get_state')
-  external static int _gdkWindowGetState(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<
     ffi.Void Function(
@@ -1574,46 +1619,6 @@ final class _GdkRectangle extends ffi.Struct {
   external int height;
 }
 
-/// Wraps GdkGeometry.
-final class _GdkGeometry extends ffi.Struct {
-  factory _GdkGeometry() {
-    return ffi.Struct.create();
-  }
-
-  @ffi.Int()
-  external int minWidth;
-
-  @ffi.Int()
-  external int minHeight;
-
-  @ffi.Int()
-  external int maxWidth;
-
-  @ffi.Int()
-  external int maxHeight;
-
-  @ffi.Int()
-  external int baseWidth;
-
-  @ffi.Int()
-  external int baseHeight;
-
-  @ffi.Int()
-  external int widthInc;
-
-  @ffi.Int()
-  external int heightInc;
-
-  @ffi.Double()
-  external double minAspect;
-
-  @ffi.Double()
-  external double maxAspect;
-
-  @ffi.Int()
-  external int winGravity;
-}
-
 /// Wraps GtkWindow.
 class _GtkWindow extends _GtkContainer {
   /// Create a new GtkWindow
@@ -1624,6 +1629,11 @@ class _GtkWindow extends _GtkContainer {
 
   /// Wraps an existing GtkWindow pointed to by [handle].
   _GtkWindow.fromHandle(ffi.Pointer<ffi.Void> handle) : super(handle.cast());
+
+  /// Destroys this window.
+  void destroy() {
+    _LinuxWindowing.destroyWindow(instance);
+  }
 
   /// Make window visible and grab focus.
   void present() {
@@ -1669,28 +1679,18 @@ class _GtkWindow extends _GtkContainer {
 
   /// Set minimum and maximum size of the window.
   void setGeometryHints({int? minWidth, int? minHeight, int? maxWidth, int? maxHeight}) {
-    final ffi.Pointer<_GdkGeometry> geometry = _gMalloc0(
-      ffi.sizeOf<_GdkGeometry>(),
-    ).cast<_GdkGeometry>();
-    final _GdkGeometry g = geometry.ref;
-    var geometryMask = 0;
-    if (minWidth != null || minHeight != null) {
-      g.minWidth = minWidth ?? 0;
-      g.minHeight = minHeight ?? 0;
-      geometryMask |= 2; // GDK_HINT_MIN_SIZE
-    }
-    if (maxWidth != null || maxHeight != null) {
-      g.maxWidth = maxWidth ?? _kMaxWindowDimensions;
-      g.maxHeight = maxHeight ?? _kMaxWindowDimensions;
-      geometryMask |= 4; // GDK_HINT_MAX_SIZE
-    }
-    _gtkWindowSetGeometryHints(instance, ffi.nullptr, geometry, geometryMask);
-    _gFree(geometry);
+    _LinuxWindowing.setWindowConstraints(
+      instance,
+      minWidth: minWidth ?? 0,
+      minHeight: minHeight ?? 0,
+      maxWidth: maxWidth ?? _kMaxWindowDimensions,
+      maxHeight: maxHeight ?? _kMaxWindowDimensions,
+    );
   }
 
   /// Resize to [width]x[height].
   void resize(int width, int height) {
-    _gtkWindowResize(instance, width, height);
+    _LinuxWindowing.setWindowSize(instance, width, height);
   }
 
   /// Maximize window.
@@ -1705,12 +1705,12 @@ class _GtkWindow extends _GtkContainer {
 
   /// Iconify (minimize) window.
   void iconify() {
-    _gtkWindowIconify(instance);
+    _LinuxWindowing.setWindowMinimized(instance, true);
   }
 
   /// Deconify (unminimize) window.
   void deiconify() {
-    _gtkWindowDeiconify(instance);
+    _LinuxWindowing.setWindowMinimized(instance, false);
   }
 
   /// Make window fullscreen.
@@ -1725,11 +1725,12 @@ class _GtkWindow extends _GtkContainer {
 
   /// Get the current size of the window.
   Size getSize() {
-    final ffi.Pointer<ffi.Int> size = _gMalloc0(ffi.sizeOf<ffi.Int>() * 2).cast<ffi.Int>();
-    _gtkWindowGetSize(instance, size.elementAt(0), size.elementAt(1));
-    final result = Size(size[0].toDouble(), size[1].toDouble());
-    _gFree(size);
-    return result;
+    return _LinuxWindowing.getWindowSize(instance);
+  }
+
+  /// true if this window has [state].
+  bool hasState(_LinuxWindowingWindowState state) {
+    return _LinuxWindowing.hasWindowState(instance, state);
   }
 
   /// true if this window has keyboard focus.
@@ -1788,52 +1789,17 @@ class _GtkWindow extends _GtkContainer {
     int height,
   );
 
-  @ffi.Native<
-    ffi.Void Function(
-      ffi.Pointer<ffi.NativeType>,
-      ffi.Pointer<ffi.NativeType>,
-      ffi.Pointer<_GdkGeometry>,
-      ffi.Int,
-    )
-  >(symbol: 'gtk_window_set_geometry_hints')
-  external static void _gtkWindowSetGeometryHints(
-    ffi.Pointer<ffi.NativeType> window,
-    ffi.Pointer<ffi.NativeType> geometryWidget,
-    ffi.Pointer<_GdkGeometry> geometry,
-    int geometryMask,
-  );
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int)>(
-    symbol: 'gtk_window_resize',
-  )
-  external static void _gtkWindowResize(ffi.Pointer<ffi.NativeType> window, int width, int height);
-
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_maximize')
   external static void _gtkWindowMaximize(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_unmaximize')
   external static void _gtkWindowUnmaximize(ffi.Pointer<ffi.NativeType> window);
 
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_iconify')
-  external static void _gtkWindowIconify(ffi.Pointer<ffi.NativeType> window);
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_deiconify')
-  external static void _gtkWindowDeiconify(ffi.Pointer<ffi.NativeType> window);
-
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_fullscreen')
   external static void _gtkWindowFullscreen(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_unfullscreen')
   external static void _gtkWindowUnfullscreen(ffi.Pointer<ffi.NativeType> window);
-
-  @ffi.Native<
-    ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Pointer<ffi.Int>, ffi.Pointer<ffi.Int>)
-  >(symbol: 'gtk_window_get_size')
-  external static void _gtkWindowGetSize(
-    ffi.Pointer<ffi.NativeType> window,
-    ffi.Pointer<ffi.Int> width,
-    ffi.Pointer<ffi.Int> height,
-  );
 
   @ffi.Native<ffi.Bool Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_is_active')
   external static bool _gtkWindowIsActive(ffi.Pointer<ffi.NativeType> widget);

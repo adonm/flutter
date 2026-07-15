@@ -194,14 +194,25 @@ TEST_F(FlViewTest, ViewDestroy) {
 
   FlView* secondary_view = fl_view_new_for_engine(engine);
 
+#if !FLUTTER_LINUX_GTK4
+  int64_t implicit_view_id = fl_view_get_id(implicit_view);
+#endif
   int64_t secondary_view_id = fl_view_get_id(secondary_view);
 
   fl_gtk_widget_destroy(GTK_WIDGET(secondary_view));
   fl_gtk_widget_destroy(GTK_WIDGET(implicit_view));
 
+#if FLUTTER_LINUX_GTK4
   EXPECT_EQ(removed_views->len, 1u);
   EXPECT_EQ(GPOINTER_TO_INT(g_ptr_array_index(removed_views, 0)),
             secondary_view_id);
+#else
+  EXPECT_EQ(removed_views->len, 2u);
+  EXPECT_EQ(GPOINTER_TO_INT(g_ptr_array_index(removed_views, 0)),
+            secondary_view_id);
+  EXPECT_EQ(GPOINTER_TO_INT(g_ptr_array_index(removed_views, 1)),
+            implicit_view_id);
+#endif
 }
 
 // Check views deregistered with errors works.

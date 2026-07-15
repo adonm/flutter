@@ -179,7 +179,7 @@ void main() {
     test(
       'Can set constraints and see the resize (Linux)',
       () async {
-        await _requestDataWithRetry(
+        final String constraintsResponse = await _requestDataWithRetry(
           driver,
           jsonEncode({
             'type': 'set_constraints',
@@ -189,6 +189,11 @@ void main() {
             'max_height': 501,
           }),
         );
+        if (constraintsResponse.isNotEmpty) {
+          final data = jsonDecode(constraintsResponse) as Map<String, Object?>;
+          expect(data['unsupported'], 'Maximum window constraints are not supported by GTK4.');
+          return;
+        }
         final String response = await _requestDataWithRetry(
           driver,
           jsonEncode({'type': 'get_size'}),

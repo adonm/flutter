@@ -9,6 +9,15 @@
 
 #include "flutter/shell/platform/linux/fl_key_event_channel.h"
 
+#if FLUTTER_LINUX_GTK4
+// GTK4 no longer names the legacy modifier bit used by the key channel for
+// Num Lock. Preserve the channel protocol value used by GTK3 and the
+// framework.
+static constexpr guint kNumLockModifier = 1 << 4;
+#else
+static constexpr guint kNumLockModifier = GDK_MOD2_MASK;
+#endif
+
 struct _FlKeyChannelResponder {
   GObject parent_instance;
 
@@ -107,10 +116,8 @@ void fl_key_channel_responder_handle_event(FlKeyChannelResponder* self,
   // interactions (for example, if shift-lock is on, tab traversal is broken).
 
   // Remove lock states from state mask.
-  guint state = fl_key_event_get_state(event) & ~GDK_LOCK_MASK;
-#if !FLUTTER_LINUX_GTK4
-  state &= ~GDK_MOD2_MASK;
-#endif
+  guint state =
+      fl_key_event_get_state(event) & ~(GDK_LOCK_MASK | kNumLockModifier);
 
   static bool shift_lock_pressed = FALSE;
   static bool caps_lock_pressed = FALSE;
@@ -130,11 +137,7 @@ void fl_key_channel_responder_handle_event(FlKeyChannelResponder* self,
   // Add back in the state matching the actual pressed state of the lock keys,
   // not the lock states.
   state |= (shift_lock_pressed || caps_lock_pressed) ? GDK_LOCK_MASK : 0x0;
-#if !FLUTTER_LINUX_GTK4
-  state |= num_lock_pressed ? GDK_MOD2_MASK : 0x0;
-#else
-  (void)num_lock_pressed;
-#endif
+  state |= num_lock_pressed ? kNumLockModifier : 0x0;
 
   fl_key_event_channel_send(
       self->channel, type, scan_code, fl_key_event_get_keyval(event), state,

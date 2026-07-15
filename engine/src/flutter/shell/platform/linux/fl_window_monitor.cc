@@ -5,6 +5,7 @@
 #include <gtk/gtk.h>
 
 #include "flutter/shell/platform/common/isolate_scope.h"
+#include "flutter/shell/platform/linux/fl_gtk.h"
 #include "flutter/shell/platform/linux/fl_window_monitor.h"
 
 struct _FlWindowMonitor {
@@ -28,7 +29,40 @@ struct _FlWindowMonitor {
 
 G_DEFINE_TYPE(FlWindowMonitor, fl_window_monitor, G_TYPE_OBJECT)
 
-#if !FLUTTER_LINUX_GTK4
+static void is_active_notify_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_is_active_notify();
+}
+
+static void title_notify_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_title_notify();
+}
+
+static void destroy_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_destroy();
+}
+
+#if FLUTTER_LINUX_GTK4
+static void configure_notify_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_configure();
+}
+
+static void toplevel_state_notify_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_state_changed();
+}
+
+static gboolean close_request_cb(FlWindowMonitor* self) {
+  flutter::IsolateScope scope(self->isolate);
+  self->on_close();
+
+  // Stop default behaviour of destroying the window.
+  return TRUE;
+}
+#else
 static gboolean configure_event_cb(FlWindowMonitor* self,
                                    GdkEventConfigure* event) {
   flutter::IsolateScope scope(self->isolate);
@@ -43,16 +77,6 @@ static gboolean window_state_event_cb(FlWindowMonitor* self,
   self->on_state_changed();
 
   return FALSE;
-}
-
-static void is_active_notify_cb(FlWindowMonitor* self) {
-  flutter::IsolateScope scope(self->isolate);
-  self->on_is_active_notify();
-}
-
-static void title_notify_cb(FlWindowMonitor* self) {
-  flutter::IsolateScope scope(self->isolate);
-  self->on_title_notify();
 }
 
 static void moved_to_rect_cb(FlWindowMonitor* self,
@@ -80,10 +104,6 @@ static gboolean delete_event_cb(FlWindowMonitor* self, GdkEvent* event) {
   return TRUE;
 }
 
-static void destroy_cb(FlWindowMonitor* self) {
-  flutter::IsolateScope scope(self->isolate);
-  self->on_destroy();
-}
 #endif
 
 static void fl_window_monitor_dispose(GObject* object) {
@@ -121,18 +141,30 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
   self->on_moved_to_rect = on_moved_to_rect;
   self->on_close = on_close;
   self->on_destroy = on_destroy;
-#if !FLUTTER_LINUX_GTK4
+#if FLUTTER_LINUX_GTK4
+  g_signal_connect_object(window, "notify::default-width",
+                          G_CALLBACK(configure_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+  g_signal_connect_object(window, "notify::default-height",
+                          G_CALLBACK(configure_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+  GdkSurface* surface = fl_gtk_widget_get_surface(GTK_WIDGET(window));
+  if (surface != nullptr && GDK_IS_TOPLEVEL(surface)) {
+    g_signal_connect_object(surface, "notify::state",
+                            G_CALLBACK(toplevel_state_notify_cb), self,
+                            G_CONNECT_SWAPPED);
+  }
+  g_signal_connect_object(window, "close-request", G_CALLBACK(close_request_cb),
+                          self, G_CONNECT_SWAPPED);
+  g_signal_connect_object(window, "unrealize", G_CALLBACK(destroy_cb), self,
+                          G_CONNECT_SWAPPED);
+#else
   g_signal_connect_object(window, "configure-event",
                           G_CALLBACK(configure_event_cb), self,
                           G_CONNECT_SWAPPED);
   g_signal_connect_object(window, "window-state-event",
                           G_CALLBACK(window_state_event_cb), self,
                           G_CONNECT_SWAPPED);
-  g_signal_connect_object(window, "notify::is-active",
-                          G_CALLBACK(is_active_notify_cb), self,
-                          G_CONNECT_SWAPPED);
-  g_signal_connect_object(window, "notify::title", G_CALLBACK(title_notify_cb),
-                          self, G_CONNECT_SWAPPED);
   g_signal_connect_object(gtk_widget_get_window(GTK_WIDGET(window)),
                           "moved-to-rect", G_CALLBACK(moved_to_rect_cb), self,
                           G_CONNECT_SWAPPED);
@@ -141,6 +173,11 @@ G_MODULE_EXPORT FlWindowMonitor* fl_window_monitor_new(
   g_signal_connect_object(window, "destroy", G_CALLBACK(destroy_cb), self,
                           G_CONNECT_SWAPPED);
 #endif
+  g_signal_connect_object(window, "notify::is-active",
+                          G_CALLBACK(is_active_notify_cb), self,
+                          G_CONNECT_SWAPPED);
+  g_signal_connect_object(window, "notify::title", G_CALLBACK(title_notify_cb),
+                          self, G_CONNECT_SWAPPED);
 
   return self;
 }

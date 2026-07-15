@@ -90,9 +90,13 @@ void main() {
           );
           // We assume that this will cause a resize, which the current tests do.
           final Size initialSize = controller.contentSize;
-          await awaitNotification(() {
-            controller.setConstraints(constraints);
-          }, () => controller.contentSize != initialSize);
+          try {
+            await awaitNotification(() {
+              controller.setConstraints(constraints);
+            }, () => controller.contentSize != initialSize);
+          } on UnsupportedError catch (error) {
+            return jsonEncode({'unsupported': error.message});
+          }
         } else if (jsonMap['type'] == 'set_fullscreen') {
           await awaitNotification(() {
             controller.setFullscreen(true);

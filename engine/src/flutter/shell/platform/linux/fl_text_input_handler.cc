@@ -297,6 +297,38 @@ static void clear_client(gpointer user_data) {
 // local coordinates to Flutter root coordinates. This function is called
 // after each of these updates. It transforms the composing rect to GDK window
 // coordinates and notifies GTK of the updated cursor position.
+static void update_im_cursor_position(FlTextInputHandler* self) {
+#if FLUTTER_LINUX_GTK4
+  fl_text_input_handler_gtk4_update_im_cursor_position(self);
+#else
+  // Skip update if not composing to avoid setting to position 0.
+  if (!self->text_model->composing()) {
+    return;
+  }
+
+  // Cannot compute a position without a widget (e.g. after the view is
+  // disposed).
+  if (self->widget == nullptr) {
+    return;
+  }
+
+  // Transform the cursor from EditableText coordinates to Flutter view
+  // coordinates.
+  gint x = self->composing_rect.x * self->editabletext_transform[0][0] +
+           self->composing_rect.y * self->editabletext_transform[1][0] +
+           self->editabletext_transform[3][0] + self->composing_rect.width;
+  gint y = self->composing_rect.x * self->editabletext_transform[0][1] +
+           self->composing_rect.y * self->editabletext_transform[1][1] +
+           self->editabletext_transform[3][1] + self->composing_rect.height;
+
+  GdkRectangle preedit_rect = {};
+  gtk_widget_translate_coordinates(self->widget,
+                                   gtk_widget_get_toplevel(self->widget), x, y,
+                                   &preedit_rect.x, &preedit_rect.y);
+  gtk_im_context_set_cursor_location(self->im_context, &preedit_rect);
+#endif
+}
+
 // Handles updates to the EditableText size and position from the framework.
 //
 // On changes to the size or position of the RenderObject underlying the
@@ -310,9 +342,7 @@ static void set_editable_size_and_transform(double* transform,
   for (size_t i = 0; i < 16; i++) {
     self->editabletext_transform[i / 4][i % 4] = transform[i];
   }
-#if FLUTTER_LINUX_GTK4
-  fl_text_input_handler_gtk4_update_im_cursor_position(self);
-#endif
+  update_im_cursor_position(self);
 }
 
 // Handles updates to the composing rect from the framework.
@@ -332,9 +362,7 @@ static void set_marked_text_rect(double x,
   self->composing_rect.y = y;
   self->composing_rect.width = width;
   self->composing_rect.height = height;
-#if FLUTTER_LINUX_GTK4
-  fl_text_input_handler_gtk4_update_im_cursor_position(self);
-#endif
+  update_im_cursor_position(self);
 }
 
 // Disposes of an FlTextInputHandler.
