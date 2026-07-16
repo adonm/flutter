@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 #include "flutter/shell/platform/linux/fl_scrolling_manager.h"
+
+#include <cmath>
+
 #include "flutter/shell/platform/embedder/embedder.h"
 #include "flutter/shell/platform/linux/fl_engine_private.h"
 
@@ -89,7 +92,11 @@ void fl_scrolling_manager_handle_scroll_event(FlScrollingManager* self,
   guint event_time = gdk_event_get_time(event);
   gdouble event_x = 0.0, event_y = 0.0;
 #if FLUTTER_LINUX_GTK4
-  gdk_event_get_position(event, &event_x, &event_y);
+  if (!gdk_event_get_position(event, &event_x, &event_y) ||
+      !std::isfinite(event_x) || !std::isfinite(event_y)) {
+    event_x = self->last_x / scale_factor;
+    event_y = self->last_y / scale_factor;
+  }
 #else
   gdk_event_get_coords(event, &event_x, &event_y);
 #endif
