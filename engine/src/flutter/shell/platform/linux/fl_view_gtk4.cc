@@ -145,7 +145,7 @@ static gboolean handle_key_event(FlView* view, GdkEvent* event) {
       fl_engine_get_keyboard_manager(view->engine), key_event,
       view->cancellable,
       [](GObject* object, GAsyncResult* result, gpointer user_data) {
-        FlView* view = FL_VIEW(user_data);
+        g_autoptr(FlView) view = FL_VIEW(user_data);
 
         g_autoptr(FlKeyEvent) redispatch_event = nullptr;
         g_autoptr(GError) error = nullptr;
@@ -163,7 +163,7 @@ static gboolean handle_key_event(FlView* view, GdkEvent* event) {
               fl_engine_get_text_input_handler(view->engine), redispatch_event);
         }
       },
-      view);
+      g_object_ref(view));
 
   return TRUE;
 }

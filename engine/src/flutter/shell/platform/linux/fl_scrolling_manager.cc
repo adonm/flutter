@@ -101,25 +101,10 @@ void fl_scrolling_manager_handle_scroll_event(FlScrollingManager* self,
   gdk_event_get_coords(event, &event_x, &event_y);
 #endif
   gdouble scroll_delta_x = 0.0, scroll_delta_y = 0.0;
-  GdkScrollDirection event_direction = GDK_SCROLL_SMOOTH;
 #if FLUTTER_LINUX_GTK4
-  event_direction = gdk_scroll_event_get_direction(event);
-  if (event_direction == GDK_SCROLL_UP) {
-    scroll_delta_x = 0;
-    scroll_delta_y = -1;
-  } else if (event_direction == GDK_SCROLL_DOWN) {
-    scroll_delta_x = 0;
-    scroll_delta_y = 1;
-  } else if (event_direction == GDK_SCROLL_LEFT) {
-    scroll_delta_x = -1;
-    scroll_delta_y = 0;
-  } else if (event_direction == GDK_SCROLL_RIGHT) {
-    scroll_delta_x = 1;
-    scroll_delta_y = 0;
-  } else {
-    gdk_scroll_event_get_deltas(event, &scroll_delta_x, &scroll_delta_y);
-  }
+  gdk_scroll_event_get_deltas(event, &scroll_delta_x, &scroll_delta_y);
 #else
+  GdkScrollDirection event_direction = GDK_SCROLL_SMOOTH;
   if (gdk_event_get_scroll_direction(event, &event_direction)) {
     if (event_direction == GDK_SCROLL_UP) {
       scroll_delta_x = 0;
@@ -142,8 +127,17 @@ void fl_scrolling_manager_handle_scroll_event(FlScrollingManager* self,
   // The multiplier is taken from the Chromium source
   // (ui/events/x/events_x_utils.cc).
   const int kScrollOffsetMultiplier = 53;
+#if FLUTTER_LINUX_GTK4
+  if (gdk_scroll_event_get_unit(event) == GDK_SCROLL_UNIT_WHEEL) {
+    scroll_delta_x *= kScrollOffsetMultiplier;
+    scroll_delta_y *= kScrollOffsetMultiplier;
+  }
+  scroll_delta_x *= scale_factor;
+  scroll_delta_y *= scale_factor;
+#else
   scroll_delta_x *= kScrollOffsetMultiplier * scale_factor;
   scroll_delta_y *= kScrollOffsetMultiplier * scale_factor;
+#endif
 
 #if FLUTTER_LINUX_GTK4
   GdkDevice* source_device = gdk_event_get_device(event);
