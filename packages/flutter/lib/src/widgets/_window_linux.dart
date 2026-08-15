@@ -96,20 +96,19 @@ class WindowingOwnerLinux extends WindowingOwner {
 
   @internal
   @override
-  RegularWindowController createRegularWindowController({
+  WindowController createWindowController({
     Size? size,
     BoxConstraints? constraints,
     required bool resizable,
     String? title,
-    required RegularWindowControllerDelegate delegate,
+    required WindowControllerDelegate delegate,
   }) {
-    final controller = RegularWindowControllerLinux(
+    final controller = WindowControllerLinux(
       owner: this,
       delegate: delegate,
       size: size,
       constraints: constraints,
       title: title,
-      resizable: resizable,
     );
     _registrar.register(
       viewId: controller.rootView.viewId,
@@ -136,7 +135,6 @@ class WindowingOwnerLinux extends WindowingOwner {
       constraints: constraints,
       parent: parent,
       title: title,
-      resizable: resizable,
     );
     _registrar.register(
       viewId: controller.rootView.viewId,
@@ -155,10 +153,6 @@ class WindowingOwnerLinux extends WindowingOwner {
     required WindowPositioner positioner,
     required BaseWindowController parent,
   }) {
-    if (_LinuxWindowing.gtkMajorVersion >= 4) {
-      throw UnimplementedError('Tooltip windows are not yet implemented for GTK4.');
-    }
-
     final controller = TooltipWindowControllerLinux(
       owner: this,
       delegate: delegate,
@@ -184,10 +178,6 @@ class WindowingOwnerLinux extends WindowingOwner {
     required WindowPositioner positioner,
     required BaseWindowController parent,
   }) {
-    if (_LinuxWindowing.gtkMajorVersion >= 4) {
-      throw UnimplementedError('Popup windows are not yet implemented for GTK4.');
-    }
-
     final controller = PopupWindowControllerLinux(
       owner: this,
       delegate: delegate,
@@ -279,7 +269,7 @@ class LinuxWindowRegistrar {
 ///
 /// {@macro flutter.widgets.windowing.experimental}
 @internal
-abstract interface class WindowControllerLinux {
+abstract interface class BaseWindowControllerLinux {
   /// Returns pointer to the underlying [GtkWindow](https://docs.gtk.org/gtk3/class.Window.html).
   ///
   /// Using this pointer implies the user is aware of any side effects changes may have to Flutter behavior.
@@ -304,15 +294,15 @@ abstract interface class WindowControllerLinux {
   ffi.Pointer<ffi.Void> get flutterViewHandle;
 }
 
-/// Implementation of [RegularWindowController] for the Linux platform.
+/// Implementation of [WindowController] for the Linux platform.
 ///
 /// {@macro flutter.widgets.windowing.experimental}
 ///
 /// See also:
 ///
-///  * [RegularWindowController], the base class for regular windows.
-class RegularWindowControllerLinux extends RegularWindowController
-    implements WindowControllerLinux {
+///  * [WindowController], the base class for regular windows.
+class WindowControllerLinux extends WindowController
+    implements BaseWindowControllerLinux {
   /// Creates a new regular window controller for Linux.
   ///
   /// When this constructor completes the native window has been created and
@@ -322,33 +312,22 @@ class RegularWindowControllerLinux extends RegularWindowController
   ///
   /// See also:
   ///
-  ///  * [RegularWindowController], the base class for regular windows.
+  ///  * [WindowController], the base class for regular windows.
   @internal
-  RegularWindowControllerLinux({
+  WindowControllerLinux({
     required WindowingOwnerLinux owner,
-    required RegularWindowControllerDelegate delegate,
+    required WindowControllerDelegate delegate,
     Size? size,
     BoxConstraints? constraints,
     String? title,
     bool decorated = true,
-    required bool resizable,
   }) : _owner = owner,
        _delegate = delegate,
+       _window = _GtkWindow(_GtkWindowType.toplevel),
        super.empty() {
     if (!isWindowingEnabled) {
       throw UnsupportedError(_kWindowingDisabledErrorMessage);
     }
-
-    final _LinuxWindowingWindow createdWindow = _LinuxWindowing.createRegularWindow(
-      _FlEngine.current(),
-      preferredSize: size,
-      preferredConstraints: constraints,
-      title: title,
-      decorated: decorated,
-      resizable: resizable,
-    );
-    _window = createdWindow.window;
-    _view = createdWindow.view;
 
     _windowMonitor = _FlWindowMonitor(
       _window,
@@ -361,25 +340,46 @@ class RegularWindowControllerLinux extends RegularWindowController
       },
       onDestroy: _delegate.onWindowDestroyed,
     );
+    if (size != null) {
+      _window.setDefaultSize(size.width.toInt(), size.height.toInt());
+    }
+    if (constraints != null) {
+      setConstraints(constraints);
+    }
+    if (title != null) {
+      setTitle(title);
+    }
+    _window.setDecorated(decorated);
+    // Force creation as Flutter will try and render to it immediately.
+    _window.realize();
+
+    final engine = _FlEngine.current();
+    _view = _FlView(engine);
     _viewMonitor = _FlViewMonitor(
       _view,
       onFirstFrame: () {
         _window.present();
       },
     );
-    final int viewId = createdWindow.viewId;
+    final int viewId = _view.getId();
     rootView = WidgetsBinding.instance.platformDispatcher.views.firstWhere(
       (FlutterView view) => view.viewId == viewId,
     );
+    _view.show();
+    _window.add(_view);
   }
 
   final WindowingOwnerLinux _owner;
-  final RegularWindowControllerDelegate _delegate;
-  late final _GtkWindow _window;
+  final WindowControllerDelegate _delegate;
+  final _GtkWindow _window;
   late final _FlView _view;
   late final _FlViewMonitor _viewMonitor;
   late final _FlWindowMonitor _windowMonitor;
   bool _destroyed = false;
+
+  @override
+  @internal
+  bool get isDestroyed => _destroyed;
 
   @override
   @internal
@@ -397,6 +397,7 @@ class RegularWindowControllerLinux extends RegularWindowController
     _windowMonitor.unref();
     _destroyed = true;
     _owner.registrar.unregister(rootView.viewId);
+    notifyListeners();
   }
 
   @override
@@ -409,16 +410,16 @@ class RegularWindowControllerLinux extends RegularWindowController
 
   @override
   @internal
-  bool get isMaximized => _window.hasState(_LinuxWindowingWindowState.maximized);
+  bool get isMaximized => _window.getWindow().getState().contains(_GdkWindowState.maximized);
 
   @override
   @internal
   // NOTE: On Wayland this is never set, see https://gitlab.gnome.org/GNOME/gtk/-/issues/67
-  bool get isMinimized => _window.hasState(_LinuxWindowingWindowState.minimized);
+  bool get isMinimized => _window.getWindow().getState().contains(_GdkWindowState.iconified);
 
   @override
   @internal
-  bool get isFullscreen => _window.hasState(_LinuxWindowingWindowState.fullscreen);
+  bool get isFullscreen => _window.getWindow().getState().contains(_GdkWindowState.fullscreen);
 
   @override
   @internal
@@ -508,7 +509,7 @@ class RegularWindowControllerLinux extends RegularWindowController
 /// See also:
 ///
 ///  * [DialogWindowController], the base class for dialog windows.
-class DialogWindowControllerLinux extends DialogWindowController implements WindowControllerLinux {
+class DialogWindowControllerLinux extends DialogWindowController implements BaseWindowControllerLinux {
   /// Creates a new dialog window controller for Linux.
   ///
   /// When this constructor completes the native window has been created and
@@ -528,34 +529,26 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
     BaseWindowController? parent,
     String? title,
     bool decorated = true,
-    required bool resizable,
   }) : _owner = owner,
        _delegate = delegate,
        _parent = parent,
+       _window = _GtkWindow(_GtkWindowType.toplevel),
        super.empty() {
     if (!isWindowingEnabled) {
       throw UnsupportedError(_kWindowingDisabledErrorMessage);
     }
 
-    _GtkWindow? parentWindow;
+    _window.setTypeHint(_GdkWindowTypeHint.dialog);
     if (parent != null) {
-      parentWindow = owner.registrar._windowForViewId(parent.rootView.viewId);
+      final _GtkWindow? parentWindow = owner.registrar._windowForViewId(parent.rootView.viewId);
       if (parentWindow == null) {
         throw Exception('Failed to find dialog parent window');
       }
+      _window.setTransientFor(parentWindow);
+      _window.setModal(true);
     }
-
-    final _LinuxWindowingWindow createdWindow = _LinuxWindowing.createDialogWindow(
-      _FlEngine.current(),
-      parent: parentWindow,
-      preferredSize: size,
-      preferredConstraints: constraints,
-      title: title,
-      decorated: decorated,
-      resizable: resizable,
-    );
-    _window = createdWindow.window;
-    _view = createdWindow.view;
+    // Force creation as Flutter will try and render to it immediately.
+    _window.realize();
 
     _windowMonitor = _FlWindowMonitor(
       _window,
@@ -568,26 +561,44 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
       },
       onDestroy: _delegate.onWindowDestroyed,
     );
+    if (size != null) {
+      _window.setDefaultSize(size.width.toInt(), size.height.toInt());
+    }
+    if (constraints != null) {
+      setConstraints(constraints);
+    }
+    if (title != null) {
+      setTitle(title);
+    }
+    _window.setDecorated(decorated);
+    final engine = _FlEngine.current();
+    _view = _FlView(engine);
     _viewMonitor = _FlViewMonitor(
       _view,
       onFirstFrame: () {
         _window.present();
       },
     );
-    final int viewId = createdWindow.viewId;
+    final int viewId = _view.getId();
     rootView = WidgetsBinding.instance.platformDispatcher.views.firstWhere(
       (FlutterView view) => view.viewId == viewId,
     );
+    _view.show();
+    _window.add(_view);
   }
 
   final WindowingOwnerLinux _owner;
   final DialogWindowControllerDelegate _delegate;
-  late final _GtkWindow _window;
+  final _GtkWindow _window;
   final BaseWindowController? _parent;
   late final _FlView _view;
   late final _FlViewMonitor _viewMonitor;
   late final _FlWindowMonitor _windowMonitor;
   bool _destroyed = false;
+
+  @override
+  @internal
+  bool get isDestroyed => _destroyed;
 
   @override
   @internal
@@ -605,6 +616,7 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
     _windowMonitor.unref();
     _destroyed = true;
     _owner.registrar.unregister(rootView.viewId);
+    notifyListeners();
   }
 
   @override
@@ -622,7 +634,7 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
   @override
   @internal
   // NOTE: On Wayland this is never set, see https://gitlab.gnome.org/GNOME/gtk/-/issues/67
-  bool get isMinimized => _window.hasState(_LinuxWindowingWindowState.minimized);
+  bool get isMinimized => _window.getWindow().getState().contains(_GdkWindowState.iconified);
 
   @override
   @internal
@@ -688,7 +700,7 @@ class DialogWindowControllerLinux extends DialogWindowController implements Wind
 ///
 ///  * [TooltipWindowController], the base class for tooltip windows.
 class TooltipWindowControllerLinux extends TooltipWindowController
-    implements WindowControllerLinux {
+    implements BaseWindowControllerLinux {
   /// Creates a new tooltip window controller for Linux.
   ///
   /// When this constructor completes the native window has been created and
@@ -763,6 +775,10 @@ class TooltipWindowControllerLinux extends TooltipWindowController
 
   @override
   @internal
+  bool get isDestroyed => _destroyed;
+
+  @override
+  @internal
   Size get contentSize => _window.getSize();
 
   @override
@@ -777,6 +793,7 @@ class TooltipWindowControllerLinux extends TooltipWindowController
     _windowMonitor.unref();
     _destroyed = true;
     _owner.registrar.unregister(rootView.viewId);
+    notifyListeners();
   }
 
   @override
@@ -878,7 +895,7 @@ class TooltipWindowControllerLinux extends TooltipWindowController
 /// See also:
 ///
 ///  * [PopupWindowController], the base class for popup windows.
-class PopupWindowControllerLinux extends PopupWindowController implements WindowControllerLinux {
+class PopupWindowControllerLinux extends PopupWindowController implements BaseWindowControllerLinux {
   /// Creates a new popup window controller for Linux.
   ///
   /// When this constructor completes the native window has been created and
@@ -955,6 +972,10 @@ class PopupWindowControllerLinux extends PopupWindowController implements Window
 
   @override
   @internal
+  bool get isDestroyed => _destroyed;
+
+  @override
+  @internal
   Size get contentSize => _window.getSize();
 
   @override
@@ -969,6 +990,7 @@ class PopupWindowControllerLinux extends PopupWindowController implements Window
     _windowMonitor.unref();
     _destroyed = true;
     _owner.registrar.unregister(rootView.viewId);
+    notifyListeners();
   }
 
   @override
@@ -1068,275 +1090,6 @@ class PopupWindowControllerLinux extends PopupWindowController implements Window
   }
 }
 
-final class _LinuxWindowingWindowResult extends ffi.Struct {
-  external ffi.Pointer<ffi.NativeType> window;
-  external ffi.Pointer<ffi.NativeType> view;
-
-  @ffi.Int64()
-  external int viewId;
-}
-
-final class _LinuxWindowingWindow {
-  const _LinuxWindowingWindow({required this.window, required this.view, required this.viewId});
-
-  final _GtkWindow window;
-  final _FlView view;
-  final int viewId;
-}
-
-class _LinuxWindowing {
-  static int get gtkMajorVersion => _getGtkMajorVersion();
-
-  static const String _maximumConstraintsUnsupported =
-      'Maximum window constraints are not supported by GTK4.';
-
-  static _LinuxWindowingWindow createRegularWindow(
-    _FlEngine engine, {
-    Size? preferredSize,
-    BoxConstraints? preferredConstraints,
-    String? title,
-    required bool decorated,
-    required bool resizable,
-  }) {
-    _validateConstraints(preferredConstraints);
-    final ffi.Pointer<ffi.Uint8> titleBuffer = title != null ? _stringToNative(title) : ffi.nullptr;
-    try {
-      return _createWindow(
-        _createRegularWindow(
-          engine.instance,
-          preferredSize != null ? 1 : 0,
-          preferredSize?.width.toInt() ?? 0,
-          preferredSize?.height.toInt() ?? 0,
-          preferredConstraints != null ? 1 : 0,
-          preferredConstraints?.minWidth.toInt() ?? 0,
-          preferredConstraints?.minHeight.toInt() ?? 0,
-          preferredConstraints?.maxWidth.isInfinite ?? true
-              ? _kMaxWindowDimensions
-              : preferredConstraints!.maxWidth.toInt(),
-          preferredConstraints?.maxHeight.isInfinite ?? true
-              ? _kMaxWindowDimensions
-              : preferredConstraints!.maxHeight.toInt(),
-          titleBuffer,
-          decorated ? 1 : 0,
-          resizable ? 1 : 0,
-        ),
-      );
-    } finally {
-      if (titleBuffer != ffi.nullptr) {
-        _gFree(titleBuffer);
-      }
-    }
-  }
-
-  static _LinuxWindowingWindow createDialogWindow(
-    _FlEngine engine, {
-    _GtkWindow? parent,
-    Size? preferredSize,
-    BoxConstraints? preferredConstraints,
-    String? title,
-    required bool decorated,
-    required bool resizable,
-  }) {
-    _validateConstraints(preferredConstraints);
-    final ffi.Pointer<ffi.Uint8> titleBuffer = title != null ? _stringToNative(title) : ffi.nullptr;
-    try {
-      return _createWindow(
-        _createDialogWindow(
-          engine.instance,
-          parent?.instance ?? ffi.nullptr,
-          preferredSize != null ? 1 : 0,
-          preferredSize?.width.toInt() ?? 0,
-          preferredSize?.height.toInt() ?? 0,
-          preferredConstraints != null ? 1 : 0,
-          preferredConstraints?.minWidth.toInt() ?? 0,
-          preferredConstraints?.minHeight.toInt() ?? 0,
-          preferredConstraints?.maxWidth.isInfinite ?? true
-              ? _kMaxWindowDimensions
-              : preferredConstraints!.maxWidth.toInt(),
-          preferredConstraints?.maxHeight.isInfinite ?? true
-              ? _kMaxWindowDimensions
-              : preferredConstraints!.maxHeight.toInt(),
-          titleBuffer,
-          decorated ? 1 : 0,
-          resizable ? 1 : 0,
-        ),
-      );
-    } finally {
-      if (titleBuffer != ffi.nullptr) {
-        _gFree(titleBuffer);
-      }
-    }
-  }
-
-  static _LinuxWindowingWindow _createWindow(ffi.Pointer<_LinuxWindowingWindowResult> result) {
-    if (result == ffi.nullptr) {
-      throw Exception('Linux failed to create a window.');
-    }
-    try {
-      return _LinuxWindowingWindow(
-        window: _GtkWindow.fromInstance(result.ref.window),
-        view: _FlView.fromInstance(result.ref.view),
-        viewId: result.ref.viewId,
-      );
-    } finally {
-      _gFree(result.cast<ffi.NativeType>());
-    }
-  }
-
-  static void _validateConstraints(BoxConstraints? constraints) {
-    if (gtkMajorVersion >= 4 &&
-        constraints != null &&
-        (constraints.hasBoundedWidth || constraints.hasBoundedHeight)) {
-      throw UnsupportedError(_maximumConstraintsUnsupported);
-    }
-  }
-
-  static void destroyWindow(ffi.Pointer<ffi.NativeType> window) {
-    _destroyWindow(window);
-  }
-
-  static Size getWindowSize(ffi.Pointer<ffi.NativeType> window) {
-    final ffi.Pointer<ffi.Int> size = _gMalloc0(ffi.sizeOf<ffi.Int>() * 2).cast<ffi.Int>();
-    _getWindowSize(window, size.elementAt(0), size.elementAt(1));
-    final result = Size(size[0].toDouble(), size[1].toDouble());
-    _gFree(size);
-    return result;
-  }
-
-  static bool hasWindowState(ffi.Pointer<ffi.NativeType> window, _LinuxWindowingWindowState state) {
-    return (_getWindowState(window) & (1 << state.index)) != 0;
-  }
-
-  static void setWindowSize(ffi.Pointer<ffi.NativeType> window, int width, int height) {
-    _setWindowSize(window, width, height);
-  }
-
-  static void setWindowConstraints(
-    ffi.Pointer<ffi.NativeType> window, {
-    required int minWidth,
-    required int minHeight,
-    required int maxWidth,
-    required int maxHeight,
-  }) {
-    if (_setWindowConstraints(window, minWidth, minHeight, maxWidth, maxHeight) == 0) {
-      throw UnsupportedError(_maximumConstraintsUnsupported);
-    }
-  }
-
-  static void setWindowMinimized(ffi.Pointer<ffi.NativeType> window, bool minimized) {
-    _setWindowMinimized(window, minimized ? 1 : 0);
-  }
-
-  @ffi.Native<
-    ffi.Pointer<_LinuxWindowingWindowResult> Function(
-      ffi.Pointer<ffi.NativeType>,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Pointer<ffi.Uint8>,
-      ffi.Int,
-      ffi.Int,
-    )
-  >(symbol: 'fl_linux_windowing_create_regular_window')
-  external static ffi.Pointer<_LinuxWindowingWindowResult> _createRegularWindow(
-    ffi.Pointer<ffi.NativeType> engine,
-    int hasPreferredSize,
-    int preferredWidth,
-    int preferredHeight,
-    int hasPreferredConstraints,
-    int minWidth,
-    int minHeight,
-    int maxWidth,
-    int maxHeight,
-    ffi.Pointer<ffi.Uint8> title,
-    int decorated,
-    int resizable,
-  );
-
-  @ffi.Native<
-    ffi.Pointer<_LinuxWindowingWindowResult> Function(
-      ffi.Pointer<ffi.NativeType>,
-      ffi.Pointer<ffi.NativeType>,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Int,
-      ffi.Pointer<ffi.Uint8>,
-      ffi.Int,
-      ffi.Int,
-    )
-  >(symbol: 'fl_linux_windowing_create_dialog_window')
-  external static ffi.Pointer<_LinuxWindowingWindowResult> _createDialogWindow(
-    ffi.Pointer<ffi.NativeType> engine,
-    ffi.Pointer<ffi.NativeType> parent,
-    int hasPreferredSize,
-    int preferredWidth,
-    int preferredHeight,
-    int hasPreferredConstraints,
-    int minWidth,
-    int minHeight,
-    int maxWidth,
-    int maxHeight,
-    ffi.Pointer<ffi.Uint8> title,
-    int decorated,
-    int resizable,
-  );
-
-  @ffi.Native<ffi.Int Function()>(symbol: 'fl_linux_windowing_get_gtk_major_version')
-  external static int _getGtkMajorVersion();
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(
-    symbol: 'fl_linux_windowing_destroy_window',
-  )
-  external static void _destroyWindow(ffi.Pointer<ffi.NativeType> window);
-
-  @ffi.Native<
-    ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Pointer<ffi.Int>, ffi.Pointer<ffi.Int>)
-  >(symbol: 'fl_linux_windowing_get_window_size')
-  external static void _getWindowSize(
-    ffi.Pointer<ffi.NativeType> window,
-    ffi.Pointer<ffi.Int> width,
-    ffi.Pointer<ffi.Int> height,
-  );
-
-  @ffi.Native<ffi.Uint32 Function(ffi.Pointer<ffi.NativeType>)>(
-    symbol: 'fl_linux_windowing_get_window_state',
-  )
-  external static int _getWindowState(ffi.Pointer<ffi.NativeType> window);
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int)>(
-    symbol: 'fl_linux_windowing_set_window_size',
-  )
-  external static void _setWindowSize(ffi.Pointer<ffi.NativeType> window, int width, int height);
-
-  @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int, ffi.Int, ffi.Int)>(
-    symbol: 'fl_linux_windowing_set_window_constraints',
-  )
-  external static int _setWindowConstraints(
-    ffi.Pointer<ffi.NativeType> window,
-    int minWidth,
-    int minHeight,
-    int maxWidth,
-    int maxHeight,
-  );
-
-  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int)>(
-    symbol: 'fl_linux_windowing_set_window_minimized',
-  )
-  external static void _setWindowMinimized(ffi.Pointer<ffi.NativeType> window, int minimized);
-}
-
-enum _LinuxWindowingWindowState { minimized, maximized, fullscreen }
-
 // The following classes are thin wrappers around the corresponding GTK/GDK
 // objects, with only the methods we need implemented. The method signatures
 // and enum values are designed to match the corresponding C APIs as closely
@@ -1345,10 +1098,31 @@ enum _LinuxWindowingWindowState { minimized, maximized, fullscreen }
 
 /// The type of a GtkWindow. Matches the GtkWindowType enum in gtk/gtktypes.h.
 enum _GtkWindowType {
-  // ignore: unused_field
   toplevel,
   // ignore: unused_field
   popup,
+}
+
+/// States a toplevel window can be in. Matches the order of the GdkWindowState
+/// enum in gdk/gdkwindow.h, except these are bit positions when passed to GTK.
+enum _GdkWindowState {
+  withdrawn,
+  iconified,
+  maximized,
+  sticky,
+  fullscreen,
+  above,
+  below,
+  focused,
+  tiled,
+  topTiled,
+  topResizable,
+  rightTiled,
+  rightResizable,
+  bottomTiled,
+  bottomResizable,
+  leftTiled,
+  leftResizable,
 }
 
 /// Hints for the window manager on how to treat a window. Matches the
@@ -1356,7 +1130,6 @@ enum _GtkWindowType {
 enum _GdkWindowTypeHint {
   // ignore: unused_field
   normal,
-  // ignore: unused_field
   dialog,
   // ignore: unused_field
   menu,
@@ -1505,6 +1278,11 @@ class _GtkWidget extends _GObject {
     return result;
   }
 
+  /// Destroy the widget.
+  void destroy() {
+    _gtkWindowDestroy(instance);
+  }
+
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_realize')
   external static void _gtkWidgetRealize(ffi.Pointer<ffi.NativeType> widget);
 
@@ -1517,6 +1295,9 @@ class _GtkWidget extends _GObject {
   external static ffi.Pointer<ffi.NativeType> _gtkWidgetGetWindow(
     ffi.Pointer<ffi.NativeType> widget,
   );
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_destroy')
+  external static void _gtkWindowDestroy(ffi.Pointer<ffi.NativeType> widget);
 
   @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_widget_get_scale_factor')
   external static int _gtkWidgetGetScaleFactor(ffi.Pointer<ffi.NativeType> widget);
@@ -1545,6 +1326,19 @@ class _GtkWidget extends _GObject {
 class _GdkWindow extends _GObject {
   /// Creates a wrapper to an existing [GdkWindow] in [instance].
   const _GdkWindow(super.instance);
+
+  /// Gets the window state.
+  Set<_GdkWindowState> getState() {
+    final int stateBits = _gdkWindowGetState(instance);
+    final states = <_GdkWindowState>{};
+    for (final _GdkWindowState state in _GdkWindowState.values) {
+      if ((stateBits & (1 << state.index)) != 0) {
+        states.add(state);
+      }
+    }
+
+    return states;
+  }
 
   /// Move the window to place it relative to the given rectangle according to the specified anchors.
   void moveToRect({
@@ -1581,6 +1375,9 @@ class _GdkWindow extends _GObject {
     );
     _gFree(rect);
   }
+
+  @ffi.Native<ffi.Int Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gdk_window_get_state')
+  external static int _gdkWindowGetState(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<
     ffi.Void Function(
@@ -1619,21 +1416,53 @@ final class _GdkRectangle extends ffi.Struct {
   external int height;
 }
 
+/// Wraps GdkGeometry.
+final class _GdkGeometry extends ffi.Struct {
+  factory _GdkGeometry() {
+    return ffi.Struct.create();
+  }
+
+  @ffi.Int()
+  external int minWidth;
+
+  @ffi.Int()
+  external int minHeight;
+
+  @ffi.Int()
+  external int maxWidth;
+
+  @ffi.Int()
+  external int maxHeight;
+
+  @ffi.Int()
+  external int baseWidth;
+
+  @ffi.Int()
+  external int baseHeight;
+
+  @ffi.Int()
+  external int widthInc;
+
+  @ffi.Int()
+  external int heightInc;
+
+  @ffi.Double()
+  external double minAspect;
+
+  @ffi.Double()
+  external double maxAspect;
+
+  @ffi.Int()
+  external int winGravity;
+}
+
 /// Wraps GtkWindow.
 class _GtkWindow extends _GtkContainer {
   /// Create a new GtkWindow
   _GtkWindow(_GtkWindowType type) : super(_gtkWindowNew(type.index));
 
-  /// Creates a wrapper to an existing [GtkWindow] in [instance].
-  const _GtkWindow.fromInstance(super.instance);
-
   /// Wraps an existing GtkWindow pointed to by [handle].
   _GtkWindow.fromHandle(ffi.Pointer<ffi.Void> handle) : super(handle.cast());
-
-  /// Destroys this window.
-  void destroy() {
-    _LinuxWindowing.destroyWindow(instance);
-  }
 
   /// Make window visible and grab focus.
   void present() {
@@ -1679,18 +1508,28 @@ class _GtkWindow extends _GtkContainer {
 
   /// Set minimum and maximum size of the window.
   void setGeometryHints({int? minWidth, int? minHeight, int? maxWidth, int? maxHeight}) {
-    _LinuxWindowing.setWindowConstraints(
-      instance,
-      minWidth: minWidth ?? 0,
-      minHeight: minHeight ?? 0,
-      maxWidth: maxWidth ?? _kMaxWindowDimensions,
-      maxHeight: maxHeight ?? _kMaxWindowDimensions,
-    );
+    final ffi.Pointer<_GdkGeometry> geometry = _gMalloc0(
+      ffi.sizeOf<_GdkGeometry>(),
+    ).cast<_GdkGeometry>();
+    final _GdkGeometry g = geometry.ref;
+    var geometryMask = 0;
+    if (minWidth != null || minHeight != null) {
+      g.minWidth = minWidth ?? 0;
+      g.minHeight = minHeight ?? 0;
+      geometryMask |= 2; // GDK_HINT_MIN_SIZE
+    }
+    if (maxWidth != null || maxHeight != null) {
+      g.maxWidth = maxWidth ?? _kMaxWindowDimensions;
+      g.maxHeight = maxHeight ?? _kMaxWindowDimensions;
+      geometryMask |= 4; // GDK_HINT_MAX_SIZE
+    }
+    _gtkWindowSetGeometryHints(instance, ffi.nullptr, geometry, geometryMask);
+    _gFree(geometry);
   }
 
   /// Resize to [width]x[height].
   void resize(int width, int height) {
-    _LinuxWindowing.setWindowSize(instance, width, height);
+    _gtkWindowResize(instance, width, height);
   }
 
   /// Maximize window.
@@ -1705,12 +1544,12 @@ class _GtkWindow extends _GtkContainer {
 
   /// Iconify (minimize) window.
   void iconify() {
-    _LinuxWindowing.setWindowMinimized(instance, true);
+    _gtkWindowIconify(instance);
   }
 
   /// Deconify (unminimize) window.
   void deiconify() {
-    _LinuxWindowing.setWindowMinimized(instance, false);
+    _gtkWindowDeiconify(instance);
   }
 
   /// Make window fullscreen.
@@ -1725,12 +1564,11 @@ class _GtkWindow extends _GtkContainer {
 
   /// Get the current size of the window.
   Size getSize() {
-    return _LinuxWindowing.getWindowSize(instance);
-  }
-
-  /// true if this window has [state].
-  bool hasState(_LinuxWindowingWindowState state) {
-    return _LinuxWindowing.hasWindowState(instance, state);
+    final ffi.Pointer<ffi.Int> size = _gMalloc0(ffi.sizeOf<ffi.Int>() * 2).cast<ffi.Int>();
+    _gtkWindowGetSize(instance, size.elementAt(0), size.elementAt(1));
+    final result = Size(size[0].toDouble(), size[1].toDouble());
+    _gFree(size);
+    return result;
   }
 
   /// true if this window has keyboard focus.
@@ -1789,17 +1627,52 @@ class _GtkWindow extends _GtkContainer {
     int height,
   );
 
+  @ffi.Native<
+    ffi.Void Function(
+      ffi.Pointer<ffi.NativeType>,
+      ffi.Pointer<ffi.NativeType>,
+      ffi.Pointer<_GdkGeometry>,
+      ffi.Int,
+    )
+  >(symbol: 'gtk_window_set_geometry_hints')
+  external static void _gtkWindowSetGeometryHints(
+    ffi.Pointer<ffi.NativeType> window,
+    ffi.Pointer<ffi.NativeType> geometryWidget,
+    ffi.Pointer<_GdkGeometry> geometry,
+    int geometryMask,
+  );
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Int, ffi.Int)>(
+    symbol: 'gtk_window_resize',
+  )
+  external static void _gtkWindowResize(ffi.Pointer<ffi.NativeType> window, int width, int height);
+
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_maximize')
   external static void _gtkWindowMaximize(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_unmaximize')
   external static void _gtkWindowUnmaximize(ffi.Pointer<ffi.NativeType> window);
 
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_iconify')
+  external static void _gtkWindowIconify(ffi.Pointer<ffi.NativeType> window);
+
+  @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_deiconify')
+  external static void _gtkWindowDeiconify(ffi.Pointer<ffi.NativeType> window);
+
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_fullscreen')
   external static void _gtkWindowFullscreen(ffi.Pointer<ffi.NativeType> window);
 
   @ffi.Native<ffi.Void Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_unfullscreen')
   external static void _gtkWindowUnfullscreen(ffi.Pointer<ffi.NativeType> window);
+
+  @ffi.Native<
+    ffi.Void Function(ffi.Pointer<ffi.NativeType>, ffi.Pointer<ffi.Int>, ffi.Pointer<ffi.Int>)
+  >(symbol: 'gtk_window_get_size')
+  external static void _gtkWindowGetSize(
+    ffi.Pointer<ffi.NativeType> window,
+    ffi.Pointer<ffi.Int> width,
+    ffi.Pointer<ffi.Int> height,
+  );
 
   @ffi.Native<ffi.Bool Function(ffi.Pointer<ffi.NativeType>)>(symbol: 'gtk_window_is_active')
   external static bool _gtkWindowIsActive(ffi.Pointer<ffi.NativeType> widget);
@@ -1823,9 +1696,6 @@ class _FlView extends _GtkWidget {
             ? _flViewNewSizedToContent(engine.instance)
             : _flViewNewForEngine(engine.instance),
       );
-
-  /// Creates a wrapper to an existing [FlView] in [instance].
-  const _FlView.fromInstance(super.instance);
 
   /// Wraps an existing FlView pointed to by [handle].
   _FlView.fromHandle(ffi.Pointer<ffi.Void> handle) : super(handle.cast());

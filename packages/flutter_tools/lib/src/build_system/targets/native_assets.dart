@@ -455,6 +455,7 @@ Future<FlutterNativeAssetsBuildRunner> createFlutterNativeAssetsBuildRunner(
     packageConfig,
     fileSystem,
     environment.logger,
+    environment.platform,
     runPackageName,
     includeDevDependencies: includeDevDependencies,
     pubspecPath,
